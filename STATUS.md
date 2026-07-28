@@ -29,6 +29,21 @@ Last updated: 2026-07-28.
   one provider delivery with zero duplicate external effects.
 - The same Build 2 spine gate passes on merged commit `7b581ba`.
 
+## Externally proven (local P4)
+
+- Clean implementation commit `08e74a4` ran one synthetic Conversation Event through real
+  OpenCode Go `glm-5.1` inference for the global Scribe, one Brain, and one Speaker.
+- Each role produced schema-validated structured output and real provider response IDs with
+  non-zero token usage. The final Speaker output contained no internal IDs, model roles,
+  confidence scores, or invented date.
+- Trusted Coworker code assigned the durable Attestation, Attention, Brain Batch, and Effect
+  identities, then settled one synthetic Surface delivery with zero duplicates.
+- The ignored local receipt is
+  `receipts/build-3a/2026-07-28T11-25-03.800Z/receipt.json`; its finalized SQLite artifact
+  hashes to `2f8ad28bf3c98da2d801153fc2daa8dbb7b015b47f1cce2fc016ea4fff43f659`.
+- This proves the real model boundary only. It does not prove WhatsApp or replay of an
+  unrecorded model output after process interruption.
+
 ## Mechanically green
 
 - `pnpm typecheck` passes for the runtime, agent, Coworker, and eval packages.
@@ -37,13 +52,15 @@ Last updated: 2026-07-28.
 - `pnpm check` validates repository canon and runs typecheck, build, both proofs, and evals.
 - Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
   `0.6.0`; emitted runtime JavaScript remains the process artifact.
+- Credential-free CI skips the opt-in real-model test explicitly; the P4 command is local and
+  separate from deterministic `pnpm check`.
 - GitHub CI passes on Build 1 PR #2.
 - GitHub CI passed on ready Build 2 PR #3 head `c2c76e5`; merged-commit runtime proof is
   recorded separately above.
 
 ## Human-only validation
 
-- No P6 human-acceptance proof is required or claimed for Builds 1–2.
+- No P6 human-acceptance proof is required or claimed for Builds 1–3A.
 
 ## Designed, not built
 
@@ -55,11 +72,12 @@ Last updated: 2026-07-28.
 ## Not proven / explicitly absent
 
 - No WhatsApp or GitHub integration.
-- No real model judgment or external model/provider inference.
+- No model-output replay proof across a process interruption.
 - No Braintrust publication; its adapter is opt-in and unproven.
-- No model or Braintrust credential.
+- No provider or Braintrust credential is committed or available to CI.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-Build 2's final-head CI, merge, and merged-commit runtime proof are complete. Build 3 is now
-the legal implementation step defined in [`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
+Build 3A's implementation and local P4 proof are complete on the branch. Its final-head CI,
+PR merge, and merged-commit proof remain required before Build 3 becomes the legal
+implementation step defined in [`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
