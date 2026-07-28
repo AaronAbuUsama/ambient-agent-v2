@@ -10,7 +10,7 @@ Last updated: 2026-07-28.
 - The architecture, domain language, build order, proof contract, environment strategy,
   evaluation methodology, decisions, and cutover contract are versioned together.
 
-## Runtime proven (local P3)
+## Runtime proven
 
 - Build 1's built Node artifact durably admits one agent prompt to SQLite.
 - A local P3 recovery run killed the process with `SIGKILL` during the first model request,
