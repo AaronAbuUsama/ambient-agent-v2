@@ -7,5 +7,7 @@ test("Build 3.1 proves normalized Conversation Intake and Surface Binding", asyn
   const receipt = await runIntakeDemo();
   assert.equal(receipt.assertions.onlyAuthorizedArrivalAdmitted, true);
   assert.equal(receipt.assertions.replayPreservesIdentity, true);
+  assert.equal(receipt.assertions.everyArchiveOnlyClassDurablyRecorded, true);
+  assert.equal(receipt.assertions.noReasoningOrDeliveryDuringIntake, true);
   assert.equal(receipt.assertions.noRawProviderEnvelope, true);
 });

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 import { createCoworker } from "@ambient-agent/coworker";
@@ -280,4 +281,94 @@ test("replaying one admitted arrival preserves one Attention item", async () => 
     assert.deepEqual(await coworker.runUntilIdle(), { processed: 0 });
     assert.equal(deliveries.length, 1);
   });
+});
+
+test("Build 2 Archive rows and references survive the Build 3.1 schema migration", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ambient-coworker-"));
+  const databasePath = join(directory, "tenant.sqlite");
+  const legacy = new DatabaseSync(databasePath);
+  legacy.exec(`
+    PRAGMA foreign_keys = ON;
+    CREATE TABLE archive_events (
+      id TEXT PRIMARY KEY,
+      surface_id TEXT NOT NULL,
+      text TEXT NOT NULL CHECK (length(text) > 0)
+    );
+    CREATE TABLE attention_items (
+      id TEXT PRIMARY KEY,
+      source_event_id TEXT NOT NULL UNIQUE REFERENCES archive_events(id),
+      status TEXT NOT NULL CHECK (status IN ('pending', 'settled'))
+    );
+    CREATE TABLE knowledge_attestations (
+      id TEXT PRIMARY KEY,
+      author TEXT NOT NULL,
+      claim TEXT NOT NULL,
+      confidence REAL NOT NULL,
+      evidence_event_id TEXT NOT NULL REFERENCES archive_events(id),
+      evidence_quote TEXT NOT NULL
+    );
+    INSERT INTO archive_events VALUES (
+      'event_legacy',
+      'surface_legacy',
+      'Preserve this source evidence.'
+    );
+    INSERT INTO attention_items VALUES ('attention_legacy', 'event_legacy', 'settled');
+    INSERT INTO knowledge_attestations VALUES (
+      'att_legacy',
+      'scribe:synthetic',
+      'Preserve this claim.',
+      1,
+      'event_legacy',
+      'Preserve this source evidence.'
+    );
+  `);
+  legacy.close();
+
+  try {
+    const coworker = createCoworker({
+      databasePath,
+      reasoner: syntheticReasoner,
+      surface: {
+        async deliver(effect) {
+          return { providerEvidence: `synthetic:${effect.id}` };
+        },
+      },
+    });
+    coworker.bindSurface({
+      provider: "synthetic",
+      providerAccountId: "account_after_migration",
+      providerConversationId: "conversation_after_migration",
+    });
+
+    const migrated = new DatabaseSync(databasePath);
+    const event = migrated
+      .prepare(
+        `SELECT id, provider, provider_conversation_id, provider_message_id,
+                kind, direction, surface_id, text
+           FROM archive_events
+          WHERE id = 'event_legacy'`,
+      )
+      .get();
+    assert.deepEqual({ ...event }, {
+      id: "event_legacy",
+      provider: "synthetic-proof",
+      provider_conversation_id: "surface_legacy",
+      provider_message_id: "event_legacy",
+      kind: "arrival",
+      direction: "inbound",
+      surface_id: "surface_legacy",
+      text: "Preserve this source evidence.",
+    });
+    assert.deepEqual(migrated.prepare("PRAGMA foreign_key_check").all(), []);
+    assert.throws(
+      () =>
+        migrated
+          .prepare("UPDATE archive_events SET text = 'mutated' WHERE id = 'event_legacy'")
+          .run(),
+      /archive events are immutable/,
+    );
+    migrated.close();
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

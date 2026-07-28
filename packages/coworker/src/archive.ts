@@ -3,11 +3,12 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { stableId } from "./ids.js";
 import type { ConversationEventId, SurfaceId } from "./ids.js";
+import {
+  normalizeProviderConversationIdentity,
+  type ProviderConversationIdentity,
+} from "./provider-conversation.js";
 
-interface ConversationEventInputBase {
-  provider: string;
-  providerAccountId: string;
-  providerConversationId: string;
+interface ConversationEventInputBase extends ProviderConversationIdentity {
   providerMessageId: string;
   direction: "inbound" | "outbound";
   occurredAt: number;
@@ -120,9 +121,8 @@ export function normalizeObservedConversationEvent(
   event: ConversationEventInput,
   surfaceId?: SurfaceId,
 ): ArchivedConversationEvent {
-  const provider = event.provider.trim();
-  const providerAccountId = event.providerAccountId.trim();
-  const providerConversationId = event.providerConversationId.trim();
+  const { provider, providerAccountId, providerConversationId } =
+    normalizeProviderConversationIdentity(event);
   const providerMessageId = event.providerMessageId.trim();
   const senderId = event.senderId?.trim();
   const text = "text" in event ? event.text.trim() : "";
@@ -251,22 +251,66 @@ export function normalizeObservedConversationEvent(
   };
 }
 
+const archiveTableSql = `
+  CREATE TABLE IF NOT EXISTS archive_events (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    provider_account_id TEXT NOT NULL,
+    provider_conversation_id TEXT NOT NULL,
+    provider_message_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('arrival', 'edit', 'revocation', 'reaction', 'receipt')),
+    direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+    occurred_at_ms INTEGER NOT NULL,
+    sender_id TEXT,
+    surface_id TEXT REFERENCES surfaces(id),
+    text TEXT NOT NULL,
+    payload_json TEXT NOT NULL
+  );
+`;
+
+function migrateBuild2Archive(database: DatabaseSync) {
+  const columns = database.prepare("PRAGMA table_info(archive_events)").all() as unknown as {
+    name: string;
+  }[];
+  if (columns.length === 0 || columns.some(({ name }) => name === "provider")) return;
+  assert.deepEqual(
+    columns.map(({ name }) => name),
+    ["id", "surface_id", "text"],
+    "Unknown Conversation Archive schema cannot be migrated safely",
+  );
+
+  database.exec("PRAGMA foreign_keys = OFF; PRAGMA legacy_alter_table = ON;");
+  try {
+    database.exec(`
+      BEGIN IMMEDIATE;
+      INSERT OR IGNORE INTO surfaces (id, status)
+        SELECT DISTINCT surface_id, 'active' FROM archive_events;
+      ALTER TABLE archive_events RENAME TO archive_events_build_2;
+      ${archiveTableSql}
+      INSERT INTO archive_events (
+        id, provider, provider_account_id, provider_conversation_id, provider_message_id,
+        kind, direction, occurred_at_ms, sender_id, surface_id, text, payload_json
+      )
+      SELECT
+        id, 'synthetic-proof', 'synthetic-proof', surface_id, id,
+        'arrival', 'inbound', 0, NULL, surface_id, text, '{}'
+      FROM archive_events_build_2;
+      DROP TABLE archive_events_build_2;
+      COMMIT;
+    `);
+  } catch (error) {
+    if (database.isTransaction) database.exec("ROLLBACK");
+    throw error;
+  } finally {
+    database.exec("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON;");
+  }
+  assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+}
+
 export function createArchiveSchema(database: DatabaseSync) {
+  migrateBuild2Archive(database);
   database.exec(`
-    CREATE TABLE IF NOT EXISTS archive_events (
-      id TEXT PRIMARY KEY,
-      provider TEXT NOT NULL,
-      provider_account_id TEXT NOT NULL,
-      provider_conversation_id TEXT NOT NULL,
-      provider_message_id TEXT NOT NULL,
-      kind TEXT NOT NULL CHECK (kind IN ('arrival', 'edit', 'revocation', 'reaction', 'receipt')),
-      direction TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
-      occurred_at_ms INTEGER NOT NULL,
-      sender_id TEXT,
-      surface_id TEXT REFERENCES surfaces(id),
-      text TEXT NOT NULL,
-      payload_json TEXT NOT NULL
-    );
+    ${archiveTableSql}
     CREATE TRIGGER IF NOT EXISTS archive_events_no_update
       BEFORE UPDATE ON archive_events BEGIN SELECT RAISE(ABORT, 'archive events are immutable'); END;
     CREATE TRIGGER IF NOT EXISTS archive_events_no_delete

@@ -3,26 +3,16 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import type { SurfaceId } from "./ids.js";
+import {
+  normalizeProviderConversationIdentity,
+  type ProviderConversationIdentity,
+} from "./provider-conversation.js";
 
-export interface SurfaceBindingInput {
-  provider: string;
-  providerAccountId: string;
-  providerConversationId: string;
-}
+export type SurfaceBindingInput = ProviderConversationIdentity;
 
 export interface SurfaceBinding extends SurfaceBindingInput {
   surfaceId: SurfaceId;
 }
-
-const normalizeBinding = (binding: SurfaceBindingInput): SurfaceBindingInput => {
-  const provider = binding.provider.trim();
-  const providerAccountId = binding.providerAccountId.trim();
-  const providerConversationId = binding.providerConversationId.trim();
-  if (!provider || !providerAccountId || !providerConversationId) {
-    throw new Error("Provider, provider account, and provider conversation are required");
-  }
-  return { provider, providerAccountId, providerConversationId };
-};
 
 export function createSurfacesSchema(database: DatabaseSync) {
   database.exec(`
@@ -47,7 +37,7 @@ export function ensureSurface(database: DatabaseSync, surfaceId: SurfaceId) {
 }
 
 export function bindSurface(database: DatabaseSync, input: SurfaceBindingInput): SurfaceBinding {
-  const binding = normalizeBinding(input);
+  const binding = normalizeProviderConversationIdentity(input);
   const existing = database
     .prepare(
       `SELECT surface_id FROM surface_bindings
@@ -75,7 +65,7 @@ export function surfaceForProviderConversation(
   database: DatabaseSync,
   input: SurfaceBindingInput,
 ): SurfaceId | undefined {
-  const binding = normalizeBinding(input);
+  const binding = normalizeProviderConversationIdentity(input);
   const row = database
     .prepare(
       `SELECT surface_id FROM surface_bindings
