@@ -1,11 +1,19 @@
 import { DatabaseSync } from "node:sqlite";
 
 import { admitAttention } from "./attention.js";
-import { archiveEvent, normalizeConversationEvent } from "./archive.js";
-import type { ConversationEventInput } from "./archive.js";
+import {
+  archiveEvent,
+  isAdmittedConversationEvent,
+  normalizeObservedConversationEvent,
+  readArchivedEvent,
+} from "./archive.js";
+import type { ArchivedConversationEvent, ConversationEventInput } from "./archive.js";
 import type { SurfaceDeliveryPort } from "./effects.js";
+import type { ConversationEventId } from "./ids.js";
 import type { CoworkerReasoner } from "./reasoning.js";
 import { createSchema, runCoworkerSpine } from "./spine.js";
+import { bindSurface, surfaceForProviderConversation } from "./surfaces.js";
+import type { SurfaceBindingInput } from "./surfaces.js";
 import { immediateTransaction } from "./transaction.js";
 
 export function createCoworker(options: {
@@ -14,16 +22,52 @@ export function createCoworker(options: {
   reasoner: CoworkerReasoner;
 }) {
   return {
-    admitConversationEvent(event: ConversationEventInput) {
-      const normalized = normalizeConversationEvent(event);
+    bindSurface(input: SurfaceBindingInput) {
       const database = new DatabaseSync(options.databasePath);
       createSchema(database);
       try {
-        const attentionId = immediateTransaction(database, () => {
+        return immediateTransaction(database, () => bindSurface(database, input));
+      } finally {
+        database.close();
+      }
+    },
+    observeConversationEvent(event: ConversationEventInput) {
+      const database = new DatabaseSync(options.databasePath);
+      createSchema(database);
+      try {
+        return immediateTransaction(database, () => {
+          const unbound = normalizeObservedConversationEvent(event);
+          const existing = readArchivedEvent(database, unbound.id);
+          if (existing) {
+            archiveEvent(database, {
+              ...unbound,
+              ...(existing.surfaceId ? { surfaceId: existing.surfaceId } : {}),
+            });
+            if (!isAdmittedConversationEvent(existing)) {
+              return { eventId: existing.id, outcome: "archived" as const };
+            }
+            const attentionId = admitAttention(database, existing);
+            return {
+              eventId: existing.id,
+              outcome: "admitted" as const,
+              surfaceId: existing.surfaceId,
+              attentionId,
+            };
+          }
+          const surfaceId = surfaceForProviderConversation(database, event);
+          const normalized = normalizeObservedConversationEvent(event, surfaceId);
           archiveEvent(database, normalized);
-          return admitAttention(database, normalized);
+          if (!isAdmittedConversationEvent(normalized)) {
+            return { eventId: normalized.id, outcome: "archived" as const };
+          }
+          const attentionId = admitAttention(database, normalized);
+          return {
+            eventId: normalized.id,
+            outcome: "admitted" as const,
+            surfaceId: normalized.surfaceId,
+            attentionId,
+          };
         });
-        return { attentionId, eventId: normalized.id };
       } finally {
         database.close();
       }
@@ -32,32 +76,32 @@ export function createCoworker(options: {
       let processed = 0;
       while (true) {
         const database = new DatabaseSync(options.databasePath);
-        let pending: { id: string; surface_id: string; text: string } | undefined;
+        let pending: { source_event_id: ConversationEventId } | undefined;
+        let event: ArchivedConversationEvent | undefined;
         try {
           createSchema(database);
           pending = database
             .prepare(
-              `SELECT archive.id, archive.surface_id, archive.text
-               FROM attention_items AS attention
-               JOIN archive_events AS archive ON archive.id = attention.source_event_id
-               WHERE attention.status = 'pending'
-               ORDER BY attention.id
+              `SELECT source_event_id
+               FROM attention_items
+               WHERE status = 'pending'
+               ORDER BY id
                LIMIT 1`,
             )
             .get() as typeof pending;
+          event = pending ? readArchivedEvent(database, pending.source_event_id) : undefined;
         } finally {
           database.close();
         }
         if (!pending) {
           return { processed };
         }
+        if (!event || !isAdmittedConversationEvent(event)) {
+          throw new Error(`Pending Attention references inadmissible event ${pending.source_event_id}`);
+        }
         await runCoworkerSpine({
           ...options,
-          event: normalizeConversationEvent({
-            id: pending.id,
-            surfaceId: pending.surface_id,
-            text: pending.text,
-          }),
+          event,
         });
         processed += 1;
       }

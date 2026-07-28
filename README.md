@@ -9,16 +9,17 @@ repository is a source of validated lessons and narrow donor code, not a structu
 
 ## Current state
 
-**Build 3A adds the first real-model Coworker slice on top of the proven synthetic spine.**
+**Build 3.1 adds provider-neutral Conversation Intake and stable Surface Binding on top of the
+proven real-model spine.**
 
-One synthetic Conversation Event now crosses the real application boundaries: immutable
-Archive, evidence-bearing Scribe Attestation, deterministic Graph projection, durable
-Attention, stable Brain Batch, typed Brain Effect, and an idempotent synthetic Surface. The
-interruption matrix proves convergence after every durable boundary. See [`STATUS.md`](./STATUS.md)
-for the exact built-versus-proven boundary.
+Trusted code now derives stable Conversation Event identity, archives normalized arrivals,
+edits, revocations, reactions, and receipts, and admits only useful live inbound arrivals from
+already-bound Surfaces. Unauthorized conversations remain durable Archive evidence without
+creating Attention. See [`STATUS.md`](./STATUS.md) for the exact built-versus-proven boundary.
 
 The opt-in Build 3A proof sends the same application flow through real Flue Scribe, Brain, and
-Speaker agents using OpenCode Go, while keeping WhatsApp out of the experiment.
+Speaker agents using OpenCode Go. New test inference defaults to DeepSeek V4 Flash, while the
+merged GLM-5.1 receipt remains the historical Build 3A proof.
 
 ## Canon
 
@@ -40,6 +41,7 @@ pnpm install
 pnpm check
 pnpm demo:recovery
 pnpm demo:spine
+pnpm demo:intake
 OPENCODE_GO_API_KEY=<development-key> pnpm demo:real-model
 pnpm evals
 pnpm evals:benchmark

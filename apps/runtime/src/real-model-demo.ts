@@ -63,8 +63,8 @@ function provider(apiKey: string) {
     },
     models: [
       {
-        id: "glm-5.1",
-        name: "GLM-5.1",
+        id: "deepseek-v4-flash",
+        name: "DeepSeek V4 Flash",
         api: "openai-completions",
         provider: "opencode-go",
         baseUrl: "https://opencode.ai/zen/go/v1",
@@ -159,10 +159,17 @@ export async function runRealModelDemo() {
   const surface = new SyntheticSurface();
   const reasoningOutputs: Partial<Record<Role, unknown>> = {};
   const input = {
-    id: "event_build_3a_real_model",
-    surfaceId: "surface_build_3a",
+    provider: "synthetic",
+    providerAccountId: "account_build_3a",
+    providerConversationId: "conversation_build_3a",
+    providerMessageId: "message_build_3a",
+    kind: "arrival" as const,
+    direction: "inbound" as const,
+    occurredAt: 1_785_235_207_000,
     text: "Please acknowledge that the deployment window is Tuesday at 15:00 UTC.",
   };
+  let conversationEventId = "";
+  let surfaceId = "";
 
   try {
     const coworker = createCoworker({
@@ -172,7 +179,11 @@ export async function runRealModelDemo() {
         reasoningOutputs[role] = output;
       }),
     });
-    coworker.admitConversationEvent(input);
+    const binding = coworker.bindSurface(input);
+    const admission = coworker.observeConversationEvent(input);
+    assert.equal(admission.outcome, "admitted");
+    conversationEventId = admission.eventId;
+    surfaceId = binding.surfaceId;
     assert.deepEqual(await coworker.runUntilIdle(), { processed: 1 });
   } finally {
     await flue.stop();
@@ -189,7 +200,7 @@ export async function runRealModelDemo() {
   assert.ok(
     modelCalls.every(
       ({ providerId, requestedModel, tokens }) =>
-        providerId === "opencode-go" && requestedModel === "glm-5.1" && tokens > 0,
+        providerId === "opencode-go" && requestedModel === "deepseek-v4-flash" && tokens > 0,
     ),
   );
   assert.deepEqual(Object.keys(reasoningOutputs).sort(), [...roles].sort());
@@ -223,8 +234,8 @@ export async function runRealModelDemo() {
   const canonicalState = readCanonicalSpineState(databasePath);
   const speakerText = (reasoningOutputs.speaker as { text: string }).text;
   const forbiddenSpeakerFragments = [
-    input.id,
-    input.surfaceId,
+    conversationEventId,
+    surfaceId,
     canonicalState.knowledge_attestations[0].id,
     canonicalState.attention_items[0].id,
     canonicalState.brain_batches[0].id,
@@ -273,7 +284,7 @@ export async function runRealModelDemo() {
           runtime: "node",
           database: "sqlite",
           provider: "opencode-go",
-          model: "glm-5.1",
+          model: "deepseek-v4-flash",
           surface: "synthetic",
         }),
       )
@@ -284,14 +295,14 @@ export async function runRealModelDemo() {
     reasoningOutputs,
     outcome,
     identities: {
-      conversationEventId: input.id,
+      conversationEventId,
       attestationId: canonicalState.knowledge_attestations[0].id,
       attentionId: canonicalState.attention_items[0].id,
       brainBatchId: canonicalState.brain_batches[0].id,
       effectId: canonicalState.effects[0].id,
       providerEvidenceId: canonicalState.effects[0].provider_evidence,
       modelResponseIds: modelCalls.flatMap(({ responseIds }) => responseIds),
-      surfaceId: input.surfaceId,
+      surfaceId,
     },
     artifacts: {
       database: relative(repositoryRoot, databasePath),

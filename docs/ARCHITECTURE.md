@@ -14,8 +14,8 @@ of it actually exists.
 1. **One coworker, many surfaces.** A person encounters one colleague, not a collection of bots.
 2. **The Brain decides; Speakers converse.** Global judgment and local expression are separate.
 3. **State has one owner.** Each durable fact has one authoritative application module.
-4. **Raw sources remain truth.** The Graph derives meaning without replacing Conversation
-   Archive or GitHub history.
+4. **Source evidence remains truth.** The Graph derives meaning without replacing immutable
+   normalized Conversation Archive events or GitHub history.
 5. **Admission is durable and non-blocking.** Accepted work survives interruption; callers do
    not wait for global reasoning.
 6. **Effects are explicit.** A model proposes typed consequences; trusted code validates,
@@ -29,10 +29,13 @@ of it actually exists.
 
 ```mermaid
 flowchart LR
-  World["WhatsApp, GitHub, schedules"] --> Archive["Raw source archive"]
+  World["WhatsApp, GitHub, schedules"] --> Intake["Trusted source normalization"]
+  Intake --> Archive["Immutable source archive"]
+  Archive --> Admission["Admission rule"]
+  Binding["Stable Surface bindings"] --> Admission
+  Admission --> Attention["Durable attention"]
   Archive --> Scribe["Scribe: proposes attestations"]
   Scribe --> Graph["Graph: attestations and belief projection"]
-  Archive --> Attention["Durable attention"]
   Graph --> Brain["Brain: owns judgment"]
   Attention --> Brain
   Brain --> Effects["Typed effects"]
@@ -86,24 +89,37 @@ apps/control-plane -> provisioning contracts over the network
 
 ## Coworker application boundary
 
-The tenant runtime constructs one Coworker and admits normalized source input through one
-application use case:
+The tenant runtime constructs one Coworker, binds authorized provider conversations to stable
+Surfaces, and observes normalized source input through one application use case:
 
 ```ts
 const coworker = createCoworker({ databasePath, surface, reasoner });
-const admission = coworker.admitConversationEvent({ id, surfaceId, text });
+const binding = coworker.bindSurface({
+  provider,
+  providerAccountId,
+  providerConversationId,
+});
+const admission = coworker.observeConversationEvent(normalizedProviderEvent);
 
 // A background worker resumes durable attention outside the caller's request.
 await coworker.runUntilIdle();
 ```
 
-Admission atomically archives the source event and creates durable Attention, then returns
-without waiting for Scribe extraction, Brain judgment, or provider delivery. A background
-worker resumes pending Attention through the same Coworker interface. Archive, Scribe
-extraction, Graph projection, Brain batching, effect execution, transactions, and recovery
-stay behind that boundary. The lower-level spine entry point is available only from the
-explicit `@ambient-agent/coworker/proof` subpath for synthetic interruption tests; runtime
-adapters must not coordinate those owners.
+Observation always archives the normalized source event first. Only a useful live inbound
+arrival already bound to an active Surface atomically creates durable Attention; outbound
+arrivals, edits, revocations, reactions, receipts, and unbound conversations remain
+archive-only. Binding a conversation later does not retroactively admit earlier events.
+Admission returns without waiting for Scribe extraction, Brain judgment, or provider
+delivery. A background worker resumes pending Attention through the same Coworker interface.
+Archive, Scribe extraction, Graph projection, Brain batching, effect execution, transactions,
+and recovery stay behind that boundary. The lower-level spine entry point is available only
+from the explicit `@ambient-agent/coworker/proof` subpath for synthetic interruption tests;
+runtime adapters must not coordinate those owners.
+
+Conversation Intake accepts a provider-neutral typed family: arrival, edit, revocation,
+reaction, and receipt. Trusted code derives stable Conversation Event identity from normalized
+provider evidence. The Archive stores minimum normalized evidence and media metadata; it does
+not retain raw provider envelopes, credentials, or media bytes.
 
 `reasoner` is the only model-facing application port. `apps/runtime` implements it with three
 Flue agents. The model may propose evidence, an objective, and words; it cannot assign durable
@@ -163,7 +179,7 @@ still prevent a differently worded retry from creating a second Attestation or E
 
 A new provider adds:
 
-1. a raw-source adapter into the Archive;
+1. a trusted source-normalization adapter into the Archive;
 2. optional Surface bindings;
 3. typed effect executors;
 4. focused scenarios and evals.

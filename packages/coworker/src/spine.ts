@@ -1,6 +1,12 @@
+import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 
-import { archiveEvent, createArchiveSchema } from "./archive.js";
+import {
+  archiveEvent,
+  createArchiveSchema,
+  migrateBuild2Archive,
+  needsBuild2ArchiveMigration,
+} from "./archive.js";
 import type { ConversationEvent } from "./archive.js";
 import { admitAttention, createAttentionSchema, settleAttention } from "./attention.js";
 import {
@@ -20,6 +26,11 @@ import {
   recordAttestation,
 } from "./knowledge.js";
 import type { CoworkerReasoner } from "./reasoning.js";
+import {
+  createSurfacesSchema,
+  ensureSurface,
+  migrateBuild2ArchiveSurfaces,
+} from "./surfaces.js";
 import { immediateTransaction } from "./transaction.js";
 
 export const durableBoundaries = [
@@ -34,8 +45,27 @@ export const durableBoundaries = [
 ] as const;
 export type DurableBoundary = (typeof durableBoundaries)[number];
 
+function migrateBuild2Schema(database: DatabaseSync) {
+  if (!needsBuild2ArchiveMigration(database)) return;
+  database.exec("PRAGMA foreign_keys = OFF; PRAGMA legacy_alter_table = ON;");
+  try {
+    database.exec("BEGIN IMMEDIATE");
+    migrateBuild2ArchiveSurfaces(database);
+    migrateBuild2Archive(database);
+    database.exec("COMMIT");
+  } catch (error) {
+    if (database.isTransaction) database.exec("ROLLBACK");
+    throw error;
+  } finally {
+    database.exec("PRAGMA legacy_alter_table = OFF; PRAGMA foreign_keys = ON;");
+  }
+  assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+}
+
 export function createSchema(database: DatabaseSync) {
   database.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+  createSurfacesSchema(database);
+  migrateBuild2Schema(database);
   createArchiveSchema(database);
   createKnowledgeSchema(database);
   createAttentionSchema(database);
@@ -101,6 +131,7 @@ export async function runCoworkerSpine(options: {
   const database = new DatabaseSync(options.databasePath);
   createSchema(database);
   try {
+    ensureSurface(database, options.event.surfaceId);
     archiveEvent(database, options.event);
     interrupt("archive-committed");
     const proposedAttestation = options.reasoner

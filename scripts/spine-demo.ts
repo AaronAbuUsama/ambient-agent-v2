@@ -6,7 +6,6 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
-import { createCoworker } from "@ambient-agent/coworker";
 import type { SurfaceDeliveryPort } from "@ambient-agent/coworker";
 import {
   normalizeConversationEvent,
@@ -112,13 +111,11 @@ export async function runSpineDemo() {
 
   const baselineDatabase = resolve(artifactDirectory, "baseline.sqlite");
   const baselineSurface = new SyntheticSurface();
-  const baselineCoworker = createCoworker({
+  await runCoworkerSpine({
     databasePath: baselineDatabase,
     surface: baselineSurface,
-    reasoner: syntheticReasoner,
+    event,
   });
-  baselineCoworker.admitConversationEvent(event);
-  await baselineCoworker.runUntilIdle();
   const baselineFingerprint = fingerprint(baselineDatabase, baselineSurface);
   const projectionBeforeRebuild = readCanonicalSpineState(baselineDatabase).knowledge_beliefs;
   const projectionDatabase = new DatabaseSync(baselineDatabase);
