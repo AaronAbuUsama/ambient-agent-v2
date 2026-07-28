@@ -79,6 +79,7 @@ async function runProviderOutcome(
 
 async function runInterruptedAttempt(databasePath: string) {
   let providerCalls = 0;
+  let modelCalls = 0;
   const surface = {
     async deliver() {
       providerCalls += 1;
@@ -103,9 +104,24 @@ async function runInterruptedAttempt(databasePath: string) {
     }),
     /synthetic process interruption/,
   );
-  await runCoworkerSpine({ databasePath, event, surface });
-  await runCoworkerSpine({ databasePath, event, surface });
-  return { providerCalls, ...readOutcome(databasePath) };
+  const unavailableReasoner = {
+    ...syntheticReasoner,
+    async scribe() {
+      modelCalls += 1;
+      throw new Error("model unavailable");
+    },
+    async brain() {
+      modelCalls += 1;
+      throw new Error("model unavailable");
+    },
+    async speaker() {
+      modelCalls += 1;
+      throw new Error("model unavailable");
+    },
+  };
+  await runCoworkerSpine({ databasePath, event, surface, reasoner: unavailableReasoner });
+  await runCoworkerSpine({ databasePath, event, surface, reasoner: unavailableReasoner });
+  return { providerCalls, modelCalls, ...readOutcome(databasePath) };
 }
 
 async function sourceFingerprint() {
@@ -211,6 +227,7 @@ export async function runDeliveryDemo() {
       failedCreatesAttention: scenarios.failed.pendingDeliveryAttention === 1,
       uncertainCreatesAttention: scenarios.uncertain.pendingDeliveryAttention === 1,
       interruptedAttemptNotRetried: scenarios.interrupted.providerCalls === 0,
+      interruptedRecoveryDoesNotNeedModel: scenarios.interrupted.modelCalls === 0,
       everyDatabaseIntegrityCheckPassed: Object.values(scenarios).every(
         ({ integrity }) => integrity === "ok",
       ),

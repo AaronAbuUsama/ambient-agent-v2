@@ -23,6 +23,7 @@ import {
   decideEffect,
   settleBatch,
 } from "./brain.js";
+import type { BrainEffect } from "./brain.js";
 import {
   completeEffect,
   createEffectsSchema,
@@ -47,8 +48,13 @@ import {
   recordSurfaceDelivery,
   settleSurfaceDelivery,
 } from "./surfaces.js";
-import type { SurfaceDeliveryPort, SurfaceDeliveryResult } from "./surfaces.js";
+import type {
+  SurfaceDelivery,
+  SurfaceDeliveryPort,
+  SurfaceDeliveryResult,
+} from "./surfaces.js";
 import { immediateTransaction } from "./transaction.js";
+import type { AttentionId, BrainBatchId, ConversationEventId } from "./ids.js";
 
 export const durableBoundaries = [
   "archive-committed",
@@ -168,6 +174,131 @@ export function readCanonicalSpineState(databasePath: string) {
   }
 }
 
+interface RecordedDeliveryWork {
+  attentionId: AttentionId;
+  batchId: BrainBatchId;
+  effect: BrainEffect;
+  delivery: SurfaceDelivery;
+}
+
+function readRecordedDeliveryWork(
+  database: DatabaseSync,
+  eventId: ConversationEventId,
+): RecordedDeliveryWork | undefined {
+  const row = database
+    .prepare(
+      `SELECT attention_items.id AS attention_id,
+              brain_batches.id AS batch_id,
+              effects.id AS effect_id,
+              effects.type AS effect_type,
+              effects.surface_id AS effect_surface_id,
+              effects.body AS effect_body,
+              surface_deliveries.id AS delivery_id,
+              surface_deliveries.status AS delivery_status,
+              surface_deliveries.provider_evidence,
+              surface_deliveries.detail
+         FROM attention_items
+         JOIN brain_batch_members
+           ON brain_batch_members.attention_id = attention_items.id
+         JOIN brain_batches
+           ON brain_batches.id = brain_batch_members.batch_id
+         JOIN effects
+           ON effects.batch_id = brain_batches.id
+         JOIN surface_deliveries
+           ON surface_deliveries.effect_id = effects.id
+        WHERE attention_items.source_event_id = ?`,
+    )
+    .get(eventId) as
+    | {
+        attention_id: AttentionId;
+        batch_id: BrainBatchId;
+        effect_id: BrainEffect["id"];
+        effect_type: BrainEffect["type"];
+        effect_surface_id: BrainEffect["surfaceId"];
+        effect_body: string;
+        delivery_id: SurfaceDelivery["id"];
+        delivery_status: SurfaceDelivery["status"];
+        provider_evidence: string | null;
+        detail: string | null;
+      }
+    | undefined;
+  if (!row) return undefined;
+  return {
+    attentionId: row.attention_id,
+    batchId: row.batch_id,
+    effect: {
+      id: row.effect_id,
+      batchId: row.batch_id,
+      type: row.effect_type,
+      surfaceId: row.effect_surface_id,
+      text: row.effect_body,
+    },
+    delivery: {
+      id: row.delivery_id,
+      effectId: row.effect_id,
+      surfaceId: row.effect_surface_id,
+      status: row.delivery_status,
+      providerEvidence: row.provider_evidence,
+      detail: row.detail,
+    },
+  };
+}
+
+function settleRecordedDelivery(
+  database: DatabaseSync,
+  work: RecordedDeliveryWork,
+  result: SurfaceDeliveryResult,
+) {
+  immediateTransaction(database, () => {
+    const settled = settleSurfaceDelivery(database, work.delivery.id, result);
+    completeEffect(database, work.effect.id);
+    settleAttention(database, work.attentionId);
+    settleBatch(database, work.batchId);
+    if (settled.status === "failed" || settled.status === "uncertain") {
+      admitDeliveryAttention(database, settled.id);
+    }
+  });
+}
+
+async function finishRecordedDelivery(
+  database: DatabaseSync,
+  work: RecordedDeliveryWork,
+  surface: SurfaceDeliveryPort,
+  interrupt: (boundary: DurableBoundary) => void,
+) {
+  if (work.delivery.status === "pending") {
+    const attempt = immediateTransaction(database, () =>
+      beginSurfaceDelivery(database, work.delivery.id),
+    );
+    assert.equal(
+      attempt.started,
+      true,
+      `Surface Delivery ${work.delivery.id} was claimed elsewhere`,
+    );
+    assert.equal(attempt.delivery.status, "attempting");
+    interrupt("delivery-attempting");
+    let result: SurfaceDeliveryResult;
+    try {
+      result = await surface.deliver(work.effect);
+    } catch (error) {
+      result = {
+        status: "uncertain",
+        detail:
+          error instanceof Error && error.message.trim()
+            ? error.message
+            : "provider call ended without a known outcome",
+      };
+    }
+    if (result.status === "sent") interrupt("provider-accepted");
+    settleRecordedDelivery(database, work, result);
+  } else if (work.delivery.status === "attempting") {
+    settleRecordedDelivery(database, work, {
+      status: "uncertain",
+      detail: "process interrupted during provider delivery",
+    });
+  }
+}
+
 export async function runCoworkerSpine(options: {
   databasePath: string;
   event: ConversationEvent;
@@ -182,6 +313,17 @@ export async function runCoworkerSpine(options: {
     ensureSurface(database, options.event.surfaceId);
     archiveEvent(database, options.event);
     interrupt("archive-committed");
+    const existingWork = readRecordedDeliveryWork(database, options.event.id);
+    if (existingWork) {
+      await finishRecordedDelivery(database, existingWork, options.surface, interrupt);
+      interrupt("settlement-recorded");
+      return {
+        batchId: existingWork.batchId,
+        effectId: existingWork.effect.id,
+        deliveryId: existingWork.delivery.id,
+        outcome: readSpineOutcome(options.databasePath),
+      };
+    }
     const proposedAttestation = options.reasoner
       ? createAttestation(
           options.event,
@@ -212,58 +354,22 @@ export async function runCoworkerSpine(options: {
           }),
         )
       : decideEffect(options.event, batchId);
-    const { recordedEffect, delivery } = immediateTransaction(database, () => {
+    const work = immediateTransaction(database, () => {
       const recordedEffect = recordEffect(database, effect);
       return {
-        recordedEffect,
+        attentionId,
+        batchId,
+        effect: recordedEffect,
         delivery: recordSurfaceDelivery(database, recordedEffect),
       };
     });
     interrupt("decision-recorded");
-
-    const settle = (result: SurfaceDeliveryResult) =>
-      immediateTransaction(database, () => {
-        const settled = settleSurfaceDelivery(database, delivery.id, result);
-        completeEffect(database, recordedEffect.id);
-        settleAttention(database, attentionId);
-        settleBatch(database, batchId);
-        if (settled.status === "failed" || settled.status === "uncertain") {
-          admitDeliveryAttention(database, settled.id);
-        }
-      });
-
-    if (delivery.status === "pending") {
-      const attempt = immediateTransaction(database, () =>
-        beginSurfaceDelivery(database, delivery.id),
-      );
-      assert.equal(attempt.started, true, `Surface Delivery ${delivery.id} was claimed elsewhere`);
-      assert.equal(attempt.delivery.status, "attempting");
-      interrupt("delivery-attempting");
-      let result: SurfaceDeliveryResult;
-      try {
-        result = await options.surface.deliver(recordedEffect);
-      } catch (error) {
-        result = {
-          status: "uncertain",
-          detail:
-            error instanceof Error && error.message.trim()
-              ? error.message
-              : "provider call ended without a known outcome",
-        };
-      }
-      if (result.status === "sent") interrupt("provider-accepted");
-      settle(result);
-    } else if (delivery.status === "attempting") {
-      settle({
-        status: "uncertain",
-        detail: "process interrupted during provider delivery",
-      });
-    }
+    await finishRecordedDelivery(database, work, options.surface, interrupt);
     interrupt("settlement-recorded");
     return {
       batchId,
-      effectId: recordedEffect.id,
-      deliveryId: delivery.id,
+      effectId: work.effect.id,
+      deliveryId: work.delivery.id,
       outcome: readSpineOutcome(options.databasePath),
     };
   } finally {

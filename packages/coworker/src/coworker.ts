@@ -20,6 +20,43 @@ export function createCoworker(options: {
   surface: SurfaceDeliveryPort;
   reasoner: CoworkerReasoner;
 }) {
+  let activeRun: Promise<{ processed: number }> | undefined;
+
+  async function drain() {
+    let processed = 0;
+    while (true) {
+      const database = new DatabaseSync(options.databasePath);
+      let pending: { source_event_id: ConversationEventId } | undefined;
+      let event: ArchivedConversationEvent | undefined;
+      try {
+        createSchema(database);
+        pending = database
+          .prepare(
+            `SELECT source_event_id
+             FROM attention_items
+             WHERE status = 'pending' AND source_event_id IS NOT NULL
+             ORDER BY id
+             LIMIT 1`,
+          )
+          .get() as typeof pending;
+        event = pending ? readArchivedEvent(database, pending.source_event_id) : undefined;
+      } finally {
+        database.close();
+      }
+      if (!pending) {
+        return { processed };
+      }
+      if (!event || !isAdmittedConversationEvent(event)) {
+        throw new Error(`Pending Attention references inadmissible event ${pending.source_event_id}`);
+      }
+      await runCoworkerSpine({
+        ...options,
+        event,
+      });
+      processed += 1;
+    }
+  }
+
   return {
     bindSurface(input: SurfaceBindingInput) {
       const database = new DatabaseSync(options.databasePath);
@@ -71,39 +108,13 @@ export function createCoworker(options: {
         database.close();
       }
     },
-    async runUntilIdle() {
-      let processed = 0;
-      while (true) {
-        const database = new DatabaseSync(options.databasePath);
-        let pending: { source_event_id: ConversationEventId } | undefined;
-        let event: ArchivedConversationEvent | undefined;
-        try {
-          createSchema(database);
-          pending = database
-            .prepare(
-              `SELECT source_event_id
-               FROM attention_items
-               WHERE status = 'pending' AND source_event_id IS NOT NULL
-               ORDER BY id
-               LIMIT 1`,
-            )
-            .get() as typeof pending;
-          event = pending ? readArchivedEvent(database, pending.source_event_id) : undefined;
-        } finally {
-          database.close();
-        }
-        if (!pending) {
-          return { processed };
-        }
-        if (!event || !isAdmittedConversationEvent(event)) {
-          throw new Error(`Pending Attention references inadmissible event ${pending.source_event_id}`);
-        }
-        await runCoworkerSpine({
-          ...options,
-          event,
+    runUntilIdle() {
+      if (!activeRun) {
+        activeRun = drain().finally(() => {
+          activeRun = undefined;
         });
-        processed += 1;
       }
+      return activeRun;
     },
   };
 }

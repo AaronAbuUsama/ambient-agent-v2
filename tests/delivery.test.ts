@@ -140,9 +140,36 @@ test("restart from attempting records uncertainty without another provider call"
     );
     assert.equal(attempts, 0);
 
-    await runCoworkerSpine({ databasePath, event, surface });
-    await runCoworkerSpine({ databasePath, event, surface });
+    let modelCalls = 0;
+    const unavailableReasoner = {
+      ...syntheticReasoner,
+      async scribe() {
+        modelCalls += 1;
+        throw new Error("model unavailable");
+      },
+      async brain() {
+        modelCalls += 1;
+        throw new Error("model unavailable");
+      },
+      async speaker() {
+        modelCalls += 1;
+        throw new Error("model unavailable");
+      },
+    };
+    await runCoworkerSpine({
+      databasePath,
+      event,
+      surface,
+      reasoner: unavailableReasoner,
+    });
+    await runCoworkerSpine({
+      databasePath,
+      event,
+      surface,
+      reasoner: unavailableReasoner,
+    });
     assert.equal(attempts, 0);
+    assert.equal(modelCalls, 0);
 
     const database = new DatabaseSync(databasePath);
     const delivery = database.prepare("SELECT status, detail FROM surface_deliveries").get();
@@ -160,6 +187,80 @@ test("restart from attempting records uncertainty without another provider call"
     });
     assert.equal(Number(deliveryAttention.count), 1);
   } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("concurrent drains share one active provider attempt and preserve sent evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ambient-delivery-concurrent-"));
+  const databasePath = join(directory, "tenant.sqlite");
+  let providerCalls = 0;
+  let releaseProvider!: () => void;
+  let providerEntered!: () => void;
+  const providerHeld = new Promise<void>((resolve) => {
+    releaseProvider = resolve;
+  });
+  const entered = new Promise<void>((resolve) => {
+    providerEntered = resolve;
+  });
+  const coworker = createCoworker({
+    databasePath,
+    reasoner: syntheticReasoner,
+    surface: {
+      async deliver() {
+        providerCalls += 1;
+        providerEntered();
+        await providerHeld;
+        return { status: "sent" as const, providerEvidence: "synthetic:concurrent-accepted" };
+      },
+    },
+  });
+  const source = {
+    provider: "synthetic",
+    providerAccountId: "account_concurrent_delivery",
+    providerConversationId: "conversation_concurrent_delivery",
+  };
+  coworker.bindSurface(source);
+  coworker.observeConversationEvent({
+    ...source,
+    providerMessageId: "message_concurrent_delivery",
+    kind: "arrival",
+    direction: "inbound",
+    occurredAt: 1_785_235_301_000,
+    text: "Preserve the one known outcome.",
+  });
+
+  try {
+    const first = coworker.runUntilIdle();
+    await entered;
+    const second = coworker.runUntilIdle();
+    assert.equal(first, second);
+    releaseProvider();
+    assert.deepEqual(await Promise.all([first, second]), [
+      { processed: 1 },
+      { processed: 1 },
+    ]);
+    assert.equal(providerCalls, 1);
+
+    const database = new DatabaseSync(databasePath);
+    const delivery = database
+      .prepare("SELECT status, provider_evidence FROM surface_deliveries")
+      .get();
+    const pendingDeliveryAttention = database
+      .prepare(
+        `SELECT count(*) AS count
+           FROM attention_items
+          WHERE status = 'pending' AND surface_delivery_id IS NOT NULL`,
+      )
+      .get() as { count: number };
+    database.close();
+    assert.deepEqual({ ...delivery }, {
+      status: "sent",
+      provider_evidence: "synthetic:concurrent-accepted",
+    });
+    assert.equal(Number(pendingDeliveryAttention.count), 0);
+  } finally {
+    releaseProvider();
     await rm(directory, { recursive: true, force: true });
   }
 });
