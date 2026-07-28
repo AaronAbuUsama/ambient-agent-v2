@@ -29,14 +29,14 @@ Last updated: 2026-07-28.
 - All eight durable-boundary interruption runs converge to the same canonical database and
   one provider delivery with zero duplicate external effects.
 - The same Build 2 spine gate passes on merged commit `7b581ba`.
-- Build 3.1's `pnpm demo:intake` passed locally on clean commit `124f59f`. Its receipt archived
+- Build 3.1's `pnpm demo:intake` passed locally on clean commit `fd928c4`. Its receipt archived
   one authorized arrival plus seven archive-only cases (unauthorized arrival, outbound
   arrival, empty inbound arrival, edit, revocation, reaction, and receipt), created exactly
   one Attention item, invoked no reasoner or Surface delivery, and persisted no supplied raw
   provider envelope.
 - The ignored local receipt is
-  `receipts/build-3-1/2026-07-28T14-45-22.083Z/receipt.json`; its finalized SQLite artifact
-  hashes to `5b85c88cc77e091172d566815491190a28f1af9a4420584a6b317942ab233220`.
+  `receipts/build-3-1/2026-07-28T15-00-28.116Z/receipt.json`; its finalized SQLite artifact
+  hashes to `835ef55127a88d663c24fdee879881f1fd55ff665f0a398d8167d5139e345f62`.
 - This Build 3.1 receipt is local P2 only. It does not prove process-interruption recovery,
   real WhatsApp normalization, or external delivery.
 
@@ -62,7 +62,7 @@ Last updated: 2026-07-28.
 - `pnpm test` builds the artifacts and passes the Flue recovery and synthetic-spine scenarios.
 - `pnpm evals` passes generated-invariant E0, recorded-fixture E1, and curated-rubric E2.
 - `pnpm check` validates repository canon and runs typecheck, build, both proofs, and evals.
-- `pnpm check` passed on Build 3.1 implementation commit `124f59f`, including the prior-schema
+- `pnpm check` passed on Build 3.1 implementation commit `fd928c4`, including the prior-schema
   migration regression and the normalized-intake receipt test.
 - Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
   `0.6.0`; emitted runtime JavaScript remains the process artifact.
@@ -96,5 +96,5 @@ Last updated: 2026-07-28.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-Build 3.1 is implemented and locally P2-proven on `124f59f`, but its final-head CI, PR merge,
+Build 3.1 is implemented and locally P2-proven on `fd928c4`, but its final-head CI, PR merge,
 and merged-commit proof are pending. Build 3.2 is not yet the legal frontier.
