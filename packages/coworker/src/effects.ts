@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type { BrainEffect } from "./brain.js";
+import type { EffectId } from "./ids.js";
 
 export interface SurfaceDeliveryPort {
   deliver(effect: BrainEffect): Promise<{ providerEvidence: string }>;
@@ -27,4 +28,14 @@ export function recordEffect(database: DatabaseSync, effect: BrainEffect) {
         (id, batch_id, type, surface_id, body, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
     )
     .run(effect.id, effect.batchId, effect.type, effect.surfaceId, effect.text);
+}
+
+export function completeEffect(
+  database: DatabaseSync,
+  effectId: EffectId,
+  providerEvidence: string,
+) {
+  database
+    .prepare("UPDATE effects SET status = 'completed', provider_evidence = ? WHERE id = ?")
+    .run(providerEvidence, effectId);
 }

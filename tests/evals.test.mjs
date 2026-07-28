@@ -5,6 +5,7 @@ import {
   normalizeBraintrustRows,
   runBenchmark,
   runCase,
+  runDeterministicEvals,
 } from "../evals/src/runner.mjs";
 
 test("every eval shape preserves common evidence for local and Braintrust reports", async () => {
@@ -16,6 +17,13 @@ test("every eval shape preserves common evidence for local and Braintrust report
   assert.deepEqual(singleRow.input.sourceObservation, E0.input);
   assert.deepEqual(singleRow.input.expected, E0.expected);
   assert.equal(singleRow.metadata.durationMs, E0.durationMs);
+
+  const suiteRows = normalizeBraintrustRows(await runDeterministicEvals());
+  assert.deepEqual(suiteRows.map((row) => row.input.dataset), [
+    "generated-invariants",
+    "synthetic-conversation",
+    "brain-curated",
+  ]);
 
   const benchmarkRows = normalizeBraintrustRows(await runBenchmark());
   assert.ok(benchmarkRows.every((row) => row.input.sourceObservation && row.output));

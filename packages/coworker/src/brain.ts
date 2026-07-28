@@ -53,3 +53,7 @@ export function decideEffect(event: ConversationEvent, batchId: BrainBatchId): B
     text: `Recorded: ${event.text.trim()}`,
   };
 }
+
+export function settleBatch(database: DatabaseSync, batchId: BrainBatchId) {
+  database.prepare("UPDATE brain_batches SET status = 'settled' WHERE id = ?").run(batchId);
+}

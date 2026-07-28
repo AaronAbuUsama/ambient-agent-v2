@@ -2,9 +2,9 @@ import { DatabaseSync } from "node:sqlite";
 
 import { archiveEvent, createArchiveSchema } from "./archive.js";
 import type { ConversationEvent } from "./archive.js";
-import { admitAttention, createAttentionSchema } from "./attention.js";
-import { claimBatch, createBrainSchema, decideEffect } from "./brain.js";
-import { createEffectsSchema, recordEffect } from "./effects.js";
+import { admitAttention, createAttentionSchema, settleAttention } from "./attention.js";
+import { claimBatch, createBrainSchema, decideEffect, settleBatch } from "./brain.js";
+import { completeEffect, createEffectsSchema, recordEffect } from "./effects.js";
 import type { SurfaceDeliveryPort } from "./effects.js";
 import {
   createKnowledgeSchema,
@@ -113,11 +113,9 @@ export async function runCoworkerSpine(options: {
       const delivery = await options.surface.deliver(effect);
       interrupt("provider-accepted");
       immediateTransaction(database, () => {
-        database
-          .prepare("UPDATE effects SET status = 'completed', provider_evidence = ? WHERE id = ?")
-          .run(delivery.providerEvidence, effect.id);
-        database.prepare("UPDATE attention_items SET status = 'settled' WHERE id = ?").run(attentionId);
-        database.prepare("UPDATE brain_batches SET status = 'settled' WHERE id = ?").run(batchId);
+        completeEffect(database, effect.id, delivery.providerEvidence);
+        settleAttention(database, attentionId);
+        settleBatch(database, batchId);
       });
     }
     interrupt("settlement-recorded");

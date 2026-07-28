@@ -23,3 +23,7 @@ export function admitAttention(database: DatabaseSync, event: ConversationEvent)
     .run(id, event.id);
   return id;
 }
+
+export function settleAttention(database: DatabaseSync, attentionId: AttentionId) {
+  database.prepare("UPDATE attention_items SET status = 'settled' WHERE id = ?").run(attentionId);
+}

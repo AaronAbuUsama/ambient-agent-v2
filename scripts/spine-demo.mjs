@@ -63,6 +63,7 @@ async function executedSourceFingerprint() {
     ...builtPaths,
     "scripts/spine-demo.mjs",
     "evals/src/runner.mjs",
+    "evals/fixtures/generated-invariants.v1.json",
     "evals/fixtures/synthetic-conversation.v1.json",
     "evals/fixtures/brain-curated.v1.json",
   ];

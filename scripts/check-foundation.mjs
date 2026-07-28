@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const required = [
@@ -105,14 +105,22 @@ for (const law of dependencyLaws) {
       [...source.matchAll(pattern)].map((match) => match[1]),
     );
     for (const specifier of imports) {
+      if (specifier.startsWith(".")) {
+        const packageBoundary = resolve(root, law.packageRoot);
+        const importedPath = resolve(root, law.sourceRoot, dirname(path), specifier);
+        assert.ok(
+          importedPath === packageBoundary || importedPath.startsWith(`${packageBoundary}${sep}`),
+          `${join(law.sourceRoot, path)} escapes its package boundary via ${specifier}`,
+        );
+        continue;
+      }
       assert.ok(
-        specifier.startsWith(".") ||
-          law.allowedImports.some(
-            (allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`),
-          ),
+        law.allowedImports.some(
+          (allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`),
+        ),
         `${join(law.sourceRoot, path)} imports non-allowlisted ${specifier}`,
       );
-      if (!specifier.startsWith(".") && !specifier.startsWith("node:")) {
+      if (!specifier.startsWith("node:")) {
         assert.ok(
           runtimeDependencies.has(packageName(specifier)),
           `${join(law.sourceRoot, path)} imports undeclared runtime dependency ${specifier}`,
