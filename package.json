@@ -9,6 +9,7 @@
   "scripts": {
     "build": "pnpm --filter @ambient-agent/coworker build && pnpm --filter @ambient-agent/runtime build",
     "check": "nub scripts/check-foundation.ts && pnpm typecheck && pnpm test && pnpm evals",
+    "demo:intake": "pnpm build && nub scripts/intake-demo.ts",
     "demo:spine": "pnpm build && nub scripts/spine-demo.ts",
     "demo:recovery": "pnpm build && nub scripts/recovery-demo.ts",
     "demo:real-model": "pnpm build && nub scripts/real-model-demo.ts",

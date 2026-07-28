@@ -21,7 +21,12 @@ flowchart LR
   B0["Build 0: repository foundation"] --> B1["Build 1: durable Flue floor"]
   B1 --> B2["Build 2: synthetic coworker spine"]
   B2 --> B3A["Build 3A: real-model coworker"]
-  B3A --> B3["Build 3: live WhatsApp coworker"]
+  B3A --> B31["Build 3.1: Conversation Intake"]
+  B31 --> B32["Build 3.2: safe Surface delivery"]
+  B32 --> B33["Build 3.3: Brain and Speaker identity"]
+  B33 --> B34["Build 3.4: thin WhatsApp adapter"]
+  B34 --> B35["Build 3.5: live proof"]
+  B35 --> B3["Build 3: live WhatsApp coworker"]
   B3 --> B4["Build 4: GitHub work loop"]
   B4 --> B5["Build 5: hosted tenant isolation"]
   B5 --> C["Production cutover"]
@@ -35,6 +40,7 @@ flowchart LR
 | Build 1 | One durable Flue v2 Node agent survives interruption | `pnpm demo:recovery` | local + CI |
 | Build 2 | Archive → Scribe → Graph/Attention → Brain → Effect works synthetically | `pnpm demo:spine` | local + CI |
 | Build 3A | Real Scribe → Brain → Speaker inference drives the synthetic Surface | `pnpm demo:real-model` | local P4 |
+| Build 3.1 | Normalized intake archives all events and admits only bound inbound arrivals | `pnpm demo:intake` | local + CI |
 | Build 3 | One real WhatsApp Surface converses and recovers | `pnpm demo:whatsapp` | local + isolated staging |
 | Build 4 | Brain-owned GitHub work completes and returns | `pnpm demo:github` | local + isolated staging |
 | Build 5 | Control plane provisions two isolated tenant runtimes | `pnpm demo:tenant` | local + hosted staging |
@@ -151,12 +157,27 @@ call before trusted code records and delivers one synthetic Say effect.
 Build 3 begins only after the smaller real-model boundary above is proven. This keeps model
 integration failures separate from WhatsApp transport and session failures.
 
+Build 3 advances through five separately reviewable stages:
+
+1. **3.1 Conversation Intake:** typed provider-neutral events, immutable Archive, minimal
+   Surface Binding, stable trusted event identity, archive-only unauthorized/non-arrival
+   events, and `pnpm demo:intake`.
+2. **3.2 Safe Surface delivery:** `pending → attempting → sent | failed | uncertain`; uncertain
+   delivery is never retried blindly and failed/uncertain outcomes create new Attention.
+3. **3.3 Brain and Speaker identity:** one `brain-global` conversation and one continuing
+   `speaker-${surfaceId}` conversation per active Surface.
+4. **3.4 Thin WhatsApp adapter:** pairing/resume, session storage, status, event normalization,
+   plain-text send, and provider acknowledgement only. Authorization, Archive, Attention,
+   model, and delivery state remain application-owned.
+5. **3.5 Live proof:** local tmux pairing with a dedicated development account, then isolated
+   staging restart/soak and explicit human acceptance.
+
 ### Delivers
 
 - `whatsappd` adapter in `apps/runtime`;
 - a dedicated development WhatsApp identity;
 - pairing and durable provider session storage;
-- raw event archival before managed-Surface admission;
+- normalized source-event archival before managed-Surface admission;
 - one continuing Speaker per active Surface;
 - Say delivery receipts and uncertain-delivery handling;
 - staging service packaging and restart operation.

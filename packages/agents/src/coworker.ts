@@ -18,7 +18,7 @@ export const speakerExpressionSchema = v.object({
   text: v.pipe(v.string(), v.minLength(1)),
 });
 
-const model = "opencode-go/glm-5.1";
+const model = "opencode-go/deepseek-v4-flash";
 
 export function ScribeAgent() {
   useModel(model, { thinkingLevel: "off", compaction: false });

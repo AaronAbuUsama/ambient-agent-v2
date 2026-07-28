@@ -30,7 +30,7 @@ conversation context. It escalates global judgment as an Intent.
 ## Conversation Archive
 
 The append-only journal of normalized provider events observed or sent by the runtime. It is
-raw source truth, not model memory.
+authoritative source evidence, not a copy of provider envelopes or model memory.
 
 ## Conversation Event
 
@@ -64,7 +64,7 @@ Corrections append another Attestation.
 
 ## Evidence Set
 
-Immutable references to raw-source observations supporting an Attestation.
+Immutable references to source observations supporting an Attestation.
 
 ## Belief Projection
 
@@ -73,12 +73,12 @@ not an independent source of truth.
 
 ## Scribe
 
-The global ingestion role that turns raw observations into proposed Attestations. It has no
+The global ingestion role that turns source observations into proposed Attestations. It has no
 authority to decide or communicate.
 
 ## Scribe Batch
 
-A bounded, cross-Surface set of raw observations and relevant Graph context presented to one
+A bounded, cross-Surface set of source observations and relevant Graph context presented to one
 stateless Scribe attempt.
 
 ## Directive

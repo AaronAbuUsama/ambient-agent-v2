@@ -20,6 +20,7 @@ import {
   recordAttestation,
 } from "./knowledge.js";
 import type { CoworkerReasoner } from "./reasoning.js";
+import { createSurfacesSchema, ensureSurface } from "./surfaces.js";
 import { immediateTransaction } from "./transaction.js";
 
 export const durableBoundaries = [
@@ -36,6 +37,7 @@ export type DurableBoundary = (typeof durableBoundaries)[number];
 
 export function createSchema(database: DatabaseSync) {
   database.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+  createSurfacesSchema(database);
   createArchiveSchema(database);
   createKnowledgeSchema(database);
   createAttentionSchema(database);
@@ -101,6 +103,7 @@ export async function runCoworkerSpine(options: {
   const database = new DatabaseSync(options.databasePath);
   createSchema(database);
   try {
+    ensureSurface(database, options.event.surfaceId);
     archiveEvent(database, options.event);
     interrupt("archive-committed");
     const proposedAttestation = options.reasoner
