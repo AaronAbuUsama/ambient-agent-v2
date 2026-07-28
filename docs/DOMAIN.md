@@ -44,8 +44,9 @@ not choose its own action.
 
 ## Attention
 
-Durable processing state identifying source events, Intents, work results, and scheduled wakes
-that require Brain judgment. Settling attention never deletes its underlying evidence.
+Durable processing state identifying source events, Surface Delivery failures/uncertainty,
+Intents, work results, and scheduled wakes that require Brain judgment. Settling attention
+never deletes its underlying evidence.
 
 ## Brain Batch
 
@@ -93,8 +94,8 @@ identity, validates it, records it before asynchronous execution, and stores its
 
 ## Surface Delivery
 
-The durable result of one logical Say across a provider boundary: attempting, sent with
-provider evidence, failed, or uncertain.
+The durable lifecycle of one logical Say across a provider boundary: pending, attempting, sent
+with provider evidence, failed, or uncertain. An uncertain delivery is not retried blindly.
 
 ## Scheduled Wake
 

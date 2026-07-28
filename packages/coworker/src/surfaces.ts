@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
-import type { SurfaceId } from "./ids.js";
+import type { BrainEffect } from "./brain.js";
+import { stableId } from "./ids.js";
+import type { EffectId, SurfaceDeliveryId, SurfaceId } from "./ids.js";
 import {
   normalizeProviderConversationIdentity,
   type ProviderConversationIdentity,
@@ -12,6 +14,25 @@ export type SurfaceBindingInput = ProviderConversationIdentity;
 
 export interface SurfaceBinding extends SurfaceBindingInput {
   surfaceId: SurfaceId;
+}
+
+export type SurfaceDeliveryResult =
+  | { status: "sent"; providerEvidence: string }
+  | { status: "failed" | "uncertain"; detail: string };
+
+export interface SurfaceDeliveryPort {
+  deliver(effect: BrainEffect): Promise<SurfaceDeliveryResult>;
+}
+
+export type SurfaceDeliveryStatus = "pending" | "attempting" | "sent" | "failed" | "uncertain";
+
+export interface SurfaceDelivery {
+  id: SurfaceDeliveryId;
+  effectId: EffectId;
+  surfaceId: SurfaceId;
+  status: SurfaceDeliveryStatus;
+  providerEvidence: string | null;
+  detail: string | null;
 }
 
 export function createSurfacesSchema(database: DatabaseSync) {
@@ -27,6 +48,19 @@ export function createSurfacesSchema(database: DatabaseSync) {
       surface_id TEXT NOT NULL UNIQUE REFERENCES surfaces(id),
       PRIMARY KEY (provider, provider_account_id, provider_conversation_id)
     );
+    CREATE TABLE IF NOT EXISTS surface_deliveries (
+      id TEXT PRIMARY KEY,
+      effect_id TEXT NOT NULL UNIQUE REFERENCES effects(id),
+      surface_id TEXT NOT NULL REFERENCES surfaces(id),
+      status TEXT NOT NULL CHECK (status IN ('pending', 'attempting', 'sent', 'failed', 'uncertain')),
+      provider_evidence TEXT,
+      detail TEXT,
+      CHECK (
+        (status = 'sent' AND provider_evidence IS NOT NULL AND detail IS NULL)
+        OR (status IN ('failed', 'uncertain') AND provider_evidence IS NULL AND detail IS NOT NULL)
+        OR (status IN ('pending', 'attempting') AND provider_evidence IS NULL AND detail IS NULL)
+      )
+    );
   `);
 }
 
@@ -41,6 +75,33 @@ export function migrateBuild2ArchiveSurfaces(database: DatabaseSync) {
     INSERT OR IGNORE INTO surfaces (id, status)
       SELECT DISTINCT surface_id, 'active' FROM archive_events;
   `);
+}
+
+export function migrateBuild31SurfaceDeliveries(database: DatabaseSync) {
+  const effects = database
+    .prepare(
+      `SELECT id, surface_id, provider_evidence
+         FROM effects
+        WHERE status = 'completed' AND provider_evidence IS NOT NULL`,
+    )
+    .all() as {
+    id: EffectId;
+    surface_id: SurfaceId;
+    provider_evidence: string;
+  }[];
+  const insert = database.prepare(
+    `INSERT OR IGNORE INTO surface_deliveries
+      (id, effect_id, surface_id, status, provider_evidence)
+     VALUES (?, ?, ?, 'sent', ?)`,
+  );
+  for (const effect of effects) {
+    insert.run(
+      stableId<"SurfaceDeliveryId">("delivery", effect.id),
+      effect.id,
+      effect.surface_id,
+      effect.provider_evidence,
+    );
+  }
 }
 
 export function bindSurface(database: DatabaseSync, input: SurfaceBindingInput): SurfaceBinding {
@@ -87,4 +148,95 @@ export function surfaceForProviderConversation(
     .get(row.surface_id) as { status: string } | undefined;
   assert.equal(surface?.status, "active");
   return row.surface_id;
+}
+
+function readSurfaceDelivery(
+  database: DatabaseSync,
+  deliveryId: SurfaceDeliveryId,
+): SurfaceDelivery {
+  const row = database
+    .prepare(
+      `SELECT id, effect_id, surface_id, status, provider_evidence, detail
+         FROM surface_deliveries
+        WHERE id = ?`,
+    )
+    .get(deliveryId) as
+    | {
+        id: SurfaceDeliveryId;
+        effect_id: EffectId;
+        surface_id: SurfaceId;
+        status: SurfaceDeliveryStatus;
+        provider_evidence: string | null;
+        detail: string | null;
+      }
+    | undefined;
+  assert.ok(row, `Surface Delivery ${deliveryId} must exist`);
+  return {
+    id: row.id,
+    effectId: row.effect_id,
+    surfaceId: row.surface_id,
+    status: row.status,
+    providerEvidence: row.provider_evidence,
+    detail: row.detail,
+  };
+}
+
+export function recordSurfaceDelivery(database: DatabaseSync, effect: BrainEffect) {
+  const deliveryId = stableId<"SurfaceDeliveryId">(
+    "delivery",
+    effect.id,
+  ) as SurfaceDeliveryId;
+  database
+    .prepare(
+      `INSERT OR IGNORE INTO surface_deliveries
+        (id, effect_id, surface_id, status) VALUES (?, ?, ?, 'pending')`,
+    )
+    .run(deliveryId, effect.id, effect.surfaceId);
+  const delivery = readSurfaceDelivery(database, deliveryId);
+  assert.equal(delivery.effectId, effect.id);
+  assert.equal(delivery.surfaceId, effect.surfaceId);
+  return delivery;
+}
+
+export function beginSurfaceDelivery(database: DatabaseSync, deliveryId: SurfaceDeliveryId) {
+  const result = database
+    .prepare(
+      `UPDATE surface_deliveries
+          SET status = 'attempting'
+        WHERE id = ? AND status = 'pending'`,
+    )
+    .run(deliveryId);
+  return {
+    started: result.changes === 1,
+    delivery: readSurfaceDelivery(database, deliveryId),
+  };
+}
+
+export function settleSurfaceDelivery(
+  database: DatabaseSync,
+  deliveryId: SurfaceDeliveryId,
+  result: SurfaceDeliveryResult,
+) {
+  if (result.status === "sent") {
+    assert.ok(result.providerEvidence.trim(), "sent delivery requires provider evidence");
+    database
+      .prepare(
+        `UPDATE surface_deliveries
+            SET status = 'sent', provider_evidence = ?, detail = NULL
+          WHERE id = ? AND status = 'attempting'`,
+      )
+      .run(result.providerEvidence.trim(), deliveryId);
+  } else {
+    assert.ok(result.detail.trim(), `${result.status} delivery requires detail`);
+    database
+      .prepare(
+        `UPDATE surface_deliveries
+            SET status = ?, provider_evidence = NULL, detail = ?
+          WHERE id = ? AND status = 'attempting'`,
+      )
+      .run(result.status, result.detail.trim(), deliveryId);
+  }
+  const delivery = readSurfaceDelivery(database, deliveryId);
+  assert.equal(delivery.status, result.status);
+  return delivery;
 }

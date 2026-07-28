@@ -9,6 +9,7 @@ export type BeliefId = Brand<"BeliefId">;
 export type AttentionId = Brand<"AttentionId">;
 export type BrainBatchId = Brand<"BrainBatchId">;
 export type EffectId = Brand<"EffectId">;
+export type SurfaceDeliveryId = Brand<"SurfaceDeliveryId">;
 
 export function stableId<Name extends string>(
   prefix: string,

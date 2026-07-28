@@ -8,12 +8,11 @@ import {
   readArchivedEvent,
 } from "./archive.js";
 import type { ArchivedConversationEvent, ConversationEventInput } from "./archive.js";
-import type { SurfaceDeliveryPort } from "./effects.js";
 import type { ConversationEventId } from "./ids.js";
 import type { CoworkerReasoner } from "./reasoning.js";
 import { createSchema, runCoworkerSpine } from "./spine.js";
 import { bindSurface, surfaceForProviderConversation } from "./surfaces.js";
-import type { SurfaceBindingInput } from "./surfaces.js";
+import type { SurfaceBindingInput, SurfaceDeliveryPort } from "./surfaces.js";
 import { immediateTransaction } from "./transaction.js";
 
 export function createCoworker(options: {
@@ -21,6 +20,43 @@ export function createCoworker(options: {
   surface: SurfaceDeliveryPort;
   reasoner: CoworkerReasoner;
 }) {
+  let drainTail: Promise<void> = Promise.resolve();
+
+  async function drain() {
+    let processed = 0;
+    while (true) {
+      const database = new DatabaseSync(options.databasePath);
+      let pending: { source_event_id: ConversationEventId } | undefined;
+      let event: ArchivedConversationEvent | undefined;
+      try {
+        createSchema(database);
+        pending = database
+          .prepare(
+            `SELECT source_event_id
+             FROM attention_items
+             WHERE status = 'pending' AND source_event_id IS NOT NULL
+             ORDER BY id
+             LIMIT 1`,
+          )
+          .get() as typeof pending;
+        event = pending ? readArchivedEvent(database, pending.source_event_id) : undefined;
+      } finally {
+        database.close();
+      }
+      if (!pending) {
+        return { processed };
+      }
+      if (!event || !isAdmittedConversationEvent(event)) {
+        throw new Error(`Pending Attention references inadmissible event ${pending.source_event_id}`);
+      }
+      await runCoworkerSpine({
+        ...options,
+        event,
+      });
+      processed += 1;
+    }
+  }
+
   return {
     bindSurface(input: SurfaceBindingInput) {
       const database = new DatabaseSync(options.databasePath);
@@ -72,39 +108,13 @@ export function createCoworker(options: {
         database.close();
       }
     },
-    async runUntilIdle() {
-      let processed = 0;
-      while (true) {
-        const database = new DatabaseSync(options.databasePath);
-        let pending: { source_event_id: ConversationEventId } | undefined;
-        let event: ArchivedConversationEvent | undefined;
-        try {
-          createSchema(database);
-          pending = database
-            .prepare(
-              `SELECT source_event_id
-               FROM attention_items
-               WHERE status = 'pending'
-               ORDER BY id
-               LIMIT 1`,
-            )
-            .get() as typeof pending;
-          event = pending ? readArchivedEvent(database, pending.source_event_id) : undefined;
-        } finally {
-          database.close();
-        }
-        if (!pending) {
-          return { processed };
-        }
-        if (!event || !isAdmittedConversationEvent(event)) {
-          throw new Error(`Pending Attention references inadmissible event ${pending.source_event_id}`);
-        }
-        await runCoworkerSpine({
-          ...options,
-          event,
-        });
-        processed += 1;
-      }
+    runUntilIdle() {
+      const run = drainTail.then(drain, drain);
+      drainTail = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
     },
   };
 }

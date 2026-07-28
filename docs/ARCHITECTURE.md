@@ -127,6 +127,17 @@ application identity or write the database. Coworker code validates exact eviden
 confidence, and non-empty speech, then assigns stable Attestation and Effect IDs before
 recording or executing anything.
 
+Surface delivery is an application-owned state machine. The coordinator records one stable
+Surface Delivery as `pending`, commits `attempting` before invoking the provider port, and then
+records exactly one of `sent`, `failed`, or `uncertain`. A restart that finds `attempting`
+records `uncertain` without another send. `failed` and `uncertain` settle the originating Effect
+and create new delivery-sourced Attention; only `sent` carries provider evidence. Surfaces owns
+the delivery lifecycle and evidence, while Effects owns the semantic intent. Build 3.2 leaves
+delivery-sourced Attention pending for Brain judgment; it never translates that Attention into
+an automatic resend. One Coworker queues its background drains, so every local trigger receives
+a pass after the previous drain instead of competing over a live provider attempt or losing an
+admission wakeup. Recovery of an already recorded delivery runs before any new model work.
+
 ## Runtime topology
 
 One tenant runtime contains one Coworker:

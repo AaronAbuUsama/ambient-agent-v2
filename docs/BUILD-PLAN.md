@@ -41,6 +41,7 @@ flowchart LR
 | Build 2 | Archive → Scribe → Graph/Attention → Brain → Effect works synthetically | `pnpm demo:spine` | local + CI |
 | Build 3A | Real Scribe → Brain → Speaker inference drives the synthetic Surface | `pnpm demo:real-model` | local P4 |
 | Build 3.1 | Normalized intake archives all events and admits only bound inbound arrivals | `pnpm demo:intake` | local + CI |
+| Build 3.2 | Surface delivery is durable and uncertain attempts are never retried blindly | `pnpm demo:delivery` | local + CI |
 | Build 3 | One real WhatsApp Surface converses and recovers | `pnpm demo:whatsapp` | local + isolated staging |
 | Build 4 | Brain-owned GitHub work completes and returns | `pnpm demo:github` | local + isolated staging |
 | Build 5 | Control plane provisions two isolated tenant runtimes | `pnpm demo:tenant` | local + hosted staging |
@@ -163,7 +164,8 @@ Build 3 advances through five separately reviewable stages:
    Surface Binding, stable trusted event identity, archive-only unauthorized/non-arrival
    events, and `pnpm demo:intake`.
 2. **3.2 Safe Surface delivery:** `pending → attempting → sent | failed | uncertain`; uncertain
-   delivery is never retried blindly and failed/uncertain outcomes create new Attention.
+   delivery is never retried blindly, failed/uncertain outcomes create new Attention, and
+   `pnpm demo:delivery` proves the four synthetic terminal/restart paths.
 3. **3.3 Brain and Speaker identity:** one `brain-global` conversation and one continuing
    `speaker-${surfaceId}` conversation per active Surface.
 4. **3.4 Thin WhatsApp adapter:** pairing/resume, session storage, status, event normalization,

@@ -48,7 +48,7 @@ class SyntheticSurface implements SurfaceDeliveryPort {
     } else {
       this.deliveries.set(effect.id, effect.text);
     }
-    return { providerEvidence: `synthetic:${effect.id}` };
+    return { status: "sent" as const, providerEvidence: `synthetic:${effect.id}` };
   }
 }
 
@@ -222,6 +222,10 @@ export async function runRealModelDemo() {
     brainBatchMembers: 1,
     effects: 1,
     completedEffects: 1,
+    surfaceDeliveries: 1,
+    sentSurfaceDeliveries: 1,
+    failedSurfaceDeliveries: 0,
+    uncertainSurfaceDeliveries: 0,
     providerDeliveries: 1,
     duplicateProviderDeliveries: 0,
   };
@@ -240,7 +244,7 @@ export async function runRealModelDemo() {
     canonicalState.attention_items[0].id,
     canonicalState.brain_batches[0].id,
     canonicalState.effects[0].id,
-    canonicalState.effects[0].provider_evidence,
+    canonicalState.surface_deliveries[0].provider_evidence,
     "scribe",
     "brain",
     "speaker",
@@ -300,7 +304,7 @@ export async function runRealModelDemo() {
       attentionId: canonicalState.attention_items[0].id,
       brainBatchId: canonicalState.brain_batches[0].id,
       effectId: canonicalState.effects[0].id,
-      providerEvidenceId: canonicalState.effects[0].provider_evidence,
+      providerEvidenceId: canonicalState.surface_deliveries[0].provider_evidence,
       modelResponseIds: modelCalls.flatMap(({ responseIds }) => responseIds),
       surfaceId,
     },
