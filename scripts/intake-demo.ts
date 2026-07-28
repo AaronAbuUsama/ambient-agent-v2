@@ -21,7 +21,7 @@ class SyntheticSurface implements SurfaceDeliveryPort {
 
   async deliver(effect: Parameters<SurfaceDeliveryPort["deliver"]>[0]) {
     this.deliveries += 1;
-    return { providerEvidence: `synthetic:${effect.id}` };
+    return { status: "sent" as const, providerEvidence: `synthetic:${effect.id}` };
   }
 }
 

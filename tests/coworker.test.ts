@@ -27,7 +27,7 @@ async function withCoworker(
     surface: {
       async deliver(effect) {
         deliveries.push(effect);
-        return { providerEvidence: `synthetic:${effect.id}` };
+        return { status: "sent" as const, providerEvidence: `synthetic:${effect.id}` };
       },
     },
   });
@@ -330,7 +330,7 @@ test("Build 2 Archive rows and references survive the Build 3.1 schema migration
       reasoner: syntheticReasoner,
       surface: {
         async deliver(effect) {
-          return { providerEvidence: `synthetic:${effect.id}` };
+          return { status: "sent" as const, providerEvidence: `synthetic:${effect.id}` };
         },
       },
     });

@@ -9,7 +9,15 @@ test("the synthetic Coworker spine converges after every durable interruption", 
   assert.equal(receipt.build, 2);
   assert.equal(receipt.scenario, "synthetic-coworker-spine");
   assert.equal(receipt.interruptionRuns.length, receipt.durableBoundaries.length);
-  assert.ok(receipt.interruptionRuns.every((run) => run.matchesBaseline));
+  assert.ok(
+    receipt.interruptionRuns.every((run) =>
+      receipt.uncertainBoundaries.includes(run.boundary)
+        ? run.deliveryStatus === "uncertain" &&
+          run.providerAttempts <= 1 &&
+          run.pendingDeliveryAttention === 1
+        : run.matchesBaseline,
+    ),
+  );
   assert.deepEqual(receipt.outcome, {
     archiveEvents: 1,
     attestations: 1,
@@ -20,6 +28,10 @@ test("the synthetic Coworker spine converges after every durable interruption", 
     brainBatchMembers: 1,
     effects: 1,
     completedEffects: 1,
+    surfaceDeliveries: 1,
+    sentSurfaceDeliveries: 1,
+    failedSurfaceDeliveries: 0,
+    uncertainSurfaceDeliveries: 0,
     providerDeliveries: 1,
     duplicateProviderDeliveries: 0,
   });

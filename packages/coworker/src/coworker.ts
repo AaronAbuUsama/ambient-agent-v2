@@ -8,12 +8,11 @@ import {
   readArchivedEvent,
 } from "./archive.js";
 import type { ArchivedConversationEvent, ConversationEventInput } from "./archive.js";
-import type { SurfaceDeliveryPort } from "./effects.js";
 import type { ConversationEventId } from "./ids.js";
 import type { CoworkerReasoner } from "./reasoning.js";
 import { createSchema, runCoworkerSpine } from "./spine.js";
 import { bindSurface, surfaceForProviderConversation } from "./surfaces.js";
-import type { SurfaceBindingInput } from "./surfaces.js";
+import type { SurfaceBindingInput, SurfaceDeliveryPort } from "./surfaces.js";
 import { immediateTransaction } from "./transaction.js";
 
 export function createCoworker(options: {
@@ -84,7 +83,7 @@ export function createCoworker(options: {
             .prepare(
               `SELECT source_event_id
                FROM attention_items
-               WHERE status = 'pending'
+               WHERE status = 'pending' AND source_event_id IS NOT NULL
                ORDER BY id
                LIMIT 1`,
             )

@@ -35,14 +35,14 @@ class SyntheticSurface implements SurfaceDeliveryPort {
     const existing = this.deliveries.get(effect.id);
     if (existing) {
       assert.equal(existing.text, effect.text);
-      return { providerEvidence: existing.providerEvidence };
+      return { status: "sent" as const, providerEvidence: existing.providerEvidence };
     }
     const delivery = {
       text: effect.text,
       providerEvidence: `synthetic:${effect.id}`,
     };
     this.deliveries.set(effect.id, delivery);
-    return { providerEvidence: delivery.providerEvidence };
+    return { status: "sent" as const, providerEvidence: delivery.providerEvidence };
   }
 
   snapshot() {
@@ -96,7 +96,15 @@ async function runInterrupted(databasePath: string, boundary: DurableBoundary) {
     new RegExp(boundary),
   );
   await runCoworkerSpine({ databasePath, event, surface });
-  return { fingerprint: fingerprint(databasePath, surface), providerAttempts: surface.attempts };
+  const state = readCanonicalSpineState(databasePath);
+  return {
+    fingerprint: fingerprint(databasePath, surface),
+    providerAttempts: surface.attempts,
+    deliveryStatus: state.surface_deliveries[0].status,
+    pendingDeliveryAttention: state.attention_items.filter(
+      ({ status, surface_delivery_id }) => status === "pending" && surface_delivery_id,
+    ).length,
+  };
 }
 
 export async function runSpineDemo() {
@@ -130,6 +138,10 @@ export async function runSpineDemo() {
   );
 
   const interruptionRuns = [];
+  const uncertainBoundaries: readonly DurableBoundary[] = [
+    "delivery-attempting",
+    "provider-accepted",
+  ];
   for (const boundary of durableBoundaries) {
     const databasePath = resolve(artifactDirectory, `${boundary}.sqlite`);
     const run = await runInterrupted(databasePath, boundary);
@@ -137,9 +149,19 @@ export async function runSpineDemo() {
       boundary,
       providerAttempts: run.providerAttempts,
       matchesBaseline: run.fingerprint === baselineFingerprint,
+      deliveryStatus: run.deliveryStatus,
+      pendingDeliveryAttention: run.pendingDeliveryAttention,
     });
   }
-  assert.ok(interruptionRuns.every(({ matchesBaseline }) => matchesBaseline));
+  assert.ok(
+    interruptionRuns.every((run) =>
+      uncertainBoundaries.includes(run.boundary)
+        ? run.deliveryStatus === "uncertain" &&
+          run.providerAttempts <= 1 &&
+          run.pendingDeliveryAttention === 1
+        : run.matchesBaseline,
+    ),
+  );
 
   const spineOutcome = readSpineOutcome(baselineDatabase);
   const canonicalState = readCanonicalSpineState(baselineDatabase);
@@ -168,6 +190,10 @@ export async function runSpineDemo() {
     brainBatchMembers: 1,
     effects: 1,
     completedEffects: 1,
+    surfaceDeliveries: 1,
+    sentSurfaceDeliveries: 1,
+    failedSurfaceDeliveries: 0,
+    uncertainSurfaceDeliveries: 0,
     providerDeliveries: 1,
     duplicateProviderDeliveries: 0,
   };
@@ -196,6 +222,7 @@ export async function runSpineDemo() {
     input: event,
     expectedOutcome,
     durableBoundaries,
+    uncertainBoundaries,
     baselineFingerprint,
     interruptionRuns,
     identities: {
@@ -205,7 +232,7 @@ export async function runSpineDemo() {
       attentionId: canonicalState.attention_items[0].id,
       brainBatchId: canonicalState.brain_batches[0].id,
       effectId: canonicalState.effects[0].id,
-      providerEvidenceId: canonicalState.effects[0].provider_evidence,
+      providerEvidenceId: canonicalState.surface_deliveries[0].provider_evidence,
       surfaceId: event.surfaceId,
     },
     outcome,
@@ -222,13 +249,20 @@ export async function runSpineDemo() {
       receipt: relative(repositoryRoot, receiptPath),
     },
     proof: {
-      deterministicStateConvergence: true,
+      deterministicStateConvergenceOutsideAmbiguousDelivery: true,
+      ambiguousDeliveryBecomesUncertain: true,
       graphProjectionRebuilt: true,
       stableBrainBatchMembership: true,
       duplicateExternalEffects: 0,
     },
     assertions: {
-      everyInterruptionMatchesBaseline: interruptionRuns.every(({ matchesBaseline }) => matchesBaseline),
+      safeInterruptionOutcome: interruptionRuns.every((run) =>
+        uncertainBoundaries.includes(run.boundary)
+          ? run.deliveryStatus === "uncertain" &&
+            run.providerAttempts <= 1 &&
+            run.pendingDeliveryAttention === 1
+          : run.matchesBaseline,
+      ),
       expectedOutcome: JSON.stringify(outcome) === JSON.stringify(expectedOutcome),
       E0: evals.E0.passed,
       E1: evals.E1.passed,
