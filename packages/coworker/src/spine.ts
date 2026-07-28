@@ -3,15 +3,23 @@ import { DatabaseSync } from "node:sqlite";
 import { archiveEvent, createArchiveSchema } from "./archive.js";
 import type { ConversationEvent } from "./archive.js";
 import { admitAttention, createAttentionSchema, settleAttention } from "./attention.js";
-import { claimBatch, createBrainSchema, decideEffect, settleBatch } from "./brain.js";
+import {
+  claimBatch,
+  createBrainSchema,
+  createSayEffect,
+  decideEffect,
+  settleBatch,
+} from "./brain.js";
 import { completeEffect, createEffectsSchema, recordEffect } from "./effects.js";
 import type { SurfaceDeliveryPort } from "./effects.js";
 import {
+  createAttestation,
   createKnowledgeSchema,
   extractAttestation,
   projectAttestation,
   recordAttestation,
 } from "./knowledge.js";
+import type { CoworkerReasoner } from "./reasoning.js";
 import { immediateTransaction } from "./transaction.js";
 
 export const durableBoundaries = [
@@ -86,6 +94,7 @@ export async function runCoworkerSpine(options: {
   databasePath: string;
   event: ConversationEvent;
   surface: SurfaceDeliveryPort;
+  reasoner?: CoworkerReasoner;
   interrupt?: (boundary: DurableBoundary) => void;
 }) {
   const interrupt = options.interrupt ?? (() => undefined);
@@ -94,8 +103,14 @@ export async function runCoworkerSpine(options: {
   try {
     archiveEvent(database, options.event);
     interrupt("archive-committed");
-    const attestation = extractAttestation(options.event);
-    recordAttestation(database, attestation);
+    const proposedAttestation = options.reasoner
+      ? createAttestation(
+          options.event,
+          await options.reasoner.scribe(options.event),
+          options.reasoner.attestationAuthor,
+        )
+      : extractAttestation(options.event);
+    const attestation = recordAttestation(database, proposedAttestation);
     interrupt("attestation-committed");
     projectAttestation(database, attestation);
     interrupt("graph-projected");
@@ -103,23 +118,39 @@ export async function runCoworkerSpine(options: {
     interrupt("attention-admitted");
     const batchId = claimBatch(database, attentionId);
     interrupt("batch-committed");
-    const effect = decideEffect(options.event, batchId);
-    recordEffect(database, effect);
+    const effect = options.reasoner
+      ? createSayEffect(
+          options.event,
+          batchId,
+          await options.reasoner.speaker({
+            event: options.event,
+            decision: await options.reasoner.brain({
+              event: options.event,
+              attestation,
+              batchId,
+            }),
+            batchId,
+          }),
+        )
+      : decideEffect(options.event, batchId);
+    const recordedEffect = recordEffect(database, effect);
     interrupt("decision-recorded");
-    const { status } = database.prepare("SELECT status FROM effects WHERE id = ?").get(effect.id) as {
+    const { status } = database
+      .prepare("SELECT status FROM effects WHERE id = ?")
+      .get(recordedEffect.id) as {
       status: "pending" | "completed";
     };
     if (status === "pending") {
-      const delivery = await options.surface.deliver(effect);
+      const delivery = await options.surface.deliver(recordedEffect);
       interrupt("provider-accepted");
       immediateTransaction(database, () => {
-        completeEffect(database, effect.id, delivery.providerEvidence);
+        completeEffect(database, recordedEffect.id, delivery.providerEvidence);
         settleAttention(database, attentionId);
         settleBatch(database, batchId);
       });
     }
     interrupt("settlement-recorded");
-    return { batchId, effectId: effect.id, outcome: readSpineOutcome(options.databasePath) };
+    return { batchId, effectId: recordedEffect.id, outcome: readSpineOutcome(options.databasePath) };
   } finally {
     database.close();
   }

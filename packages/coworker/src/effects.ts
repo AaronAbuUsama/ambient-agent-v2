@@ -28,6 +28,25 @@ export function recordEffect(database: DatabaseSync, effect: BrainEffect) {
         (id, batch_id, type, surface_id, body, status) VALUES (?, ?, ?, ?, ?, 'pending')`,
     )
     .run(effect.id, effect.batchId, effect.type, effect.surfaceId, effect.text);
+  const row = database
+    .prepare(
+      `SELECT id, batch_id, type, surface_id, body
+       FROM effects WHERE id = ?`,
+    )
+    .get(effect.id) as {
+    id: BrainEffect["id"];
+    batch_id: BrainEffect["batchId"];
+    type: BrainEffect["type"];
+    surface_id: BrainEffect["surfaceId"];
+    body: string;
+  };
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    type: row.type,
+    surfaceId: row.surface_id,
+    text: row.body,
+  } satisfies BrainEffect;
 }
 
 export function completeEffect(

@@ -90,7 +90,7 @@ The tenant runtime constructs one Coworker and admits normalized source input th
 application use case:
 
 ```ts
-const coworker = createCoworker({ databasePath, surface });
+const coworker = createCoworker({ databasePath, surface, reasoner });
 const admission = coworker.admitConversationEvent({ id, surfaceId, text });
 
 // A background worker resumes durable attention outside the caller's request.
@@ -104,6 +104,12 @@ extraction, Graph projection, Brain batching, effect execution, transactions, an
 stay behind that boundary. The lower-level spine entry point is available only from the
 explicit `@ambient-agent/coworker/proof` subpath for synthetic interruption tests; runtime
 adapters must not coordinate those owners.
+
+`reasoner` is the only model-facing application port. `apps/runtime` implements it with three
+Flue agents. The model may propose evidence, an objective, and words; it cannot assign durable
+application identity or write the database. Coworker code validates exact evidence,
+confidence, and non-empty speech, then assigns stable Attestation and Effect IDs before
+recording or executing anything.
 
 ## Runtime topology
 
@@ -147,6 +153,11 @@ the Coworker application boundary and transactions defined by the owning modules
   evidence-bearing Attestations and never decides or speaks.
 - **Speaker:** one continuing conversational agent per Surface. It can converse locally and
   escalate an Intent; it cannot mutate global knowledge or launch work.
+
+Build 3A proves these three role boundaries with a synthetic Surface. It does not yet prove
+model-output replay across interruption: if a model result was not durably recorded before a
+crash, that role may be inferred again. Stable application IDs and canonical-record reads
+still prevent a differently worded retry from creating a second Attestation or Effect.
 
 ## Extension rule
 
