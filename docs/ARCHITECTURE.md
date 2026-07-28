@@ -91,12 +91,19 @@ application use case:
 
 ```ts
 const coworker = createCoworker({ databasePath, surface });
-await coworker.admitConversationEvent({ id, surfaceId, text });
+const admission = coworker.admitConversationEvent({ id, surfaceId, text });
+
+// A background worker resumes durable attention outside the caller's request.
+await coworker.runUntilIdle();
 ```
 
-Archive, Scribe extraction, Graph projection, Attention, Brain batching, effect execution,
-transactions, and recovery stay behind that boundary. The lower-level spine entry point exists
-only for the synthetic interruption proof; runtime adapters must not coordinate those owners.
+Admission atomically archives the source event and creates durable Attention, then returns
+without waiting for Scribe extraction, Brain judgment, or provider delivery. A background
+worker resumes pending Attention through the same Coworker interface. Archive, Scribe
+extraction, Graph projection, Brain batching, effect execution, transactions, and recovery
+stay behind that boundary. The lower-level spine entry point is available only from the
+explicit `@ambient-agent/coworker/proof` subpath for synthetic interruption tests; runtime
+adapters must not coordinate those owners.
 
 ## Runtime topology
 

@@ -6,20 +6,17 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
+import { createCoworker } from "@ambient-agent/coworker";
+import type { SurfaceDeliveryPort } from "@ambient-agent/coworker";
 import {
-  createCoworker,
   normalizeConversationEvent,
   durableBoundaries,
   rebuildGraph,
   readCanonicalSpineState,
   readSpineOutcome,
   runCoworkerSpine,
-} from "@ambient-agent/coworker";
-import type {
-  BrainEffect,
-  DurableBoundary,
-  SurfaceDeliveryPort,
-} from "@ambient-agent/coworker";
+} from "@ambient-agent/coworker/proof";
+import type { BrainEffect, DurableBoundary } from "@ambient-agent/coworker/proof";
 import { runDeterministicEvals } from "../evals/src/runner.js";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -98,7 +95,7 @@ async function runInterrupted(databasePath: string, boundary: DurableBoundary) {
     }),
     new RegExp(boundary),
   );
-  await createCoworker({ databasePath, surface }).admitConversationEvent(event);
+  await runCoworkerSpine({ databasePath, event, surface });
   return { fingerprint: fingerprint(databasePath, surface), providerAttempts: surface.attempts };
 }
 
@@ -114,10 +111,12 @@ export async function runSpineDemo() {
 
   const baselineDatabase = resolve(artifactDirectory, "baseline.sqlite");
   const baselineSurface = new SyntheticSurface();
-  const baselineRun = await createCoworker({
+  const baselineCoworker = createCoworker({
     databasePath: baselineDatabase,
     surface: baselineSurface,
-  }).admitConversationEvent(event);
+  });
+  baselineCoworker.admitConversationEvent(event);
+  await baselineCoworker.runUntilIdle();
   const baselineFingerprint = fingerprint(baselineDatabase, baselineSurface);
   const projectionBeforeRebuild = readCanonicalSpineState(baselineDatabase).knowledge_beliefs;
   const projectionDatabase = new DatabaseSync(baselineDatabase);
@@ -205,8 +204,8 @@ export async function runSpineDemo() {
       attestationId: canonicalState.knowledge_attestations[0].id,
       beliefId: canonicalState.knowledge_beliefs[0].id,
       attentionId: canonicalState.attention_items[0].id,
-      brainBatchId: baselineRun.batchId,
-      effectId: baselineRun.effectId,
+      brainBatchId: canonicalState.brain_batches[0].id,
+      effectId: canonicalState.effects[0].id,
       providerEvidenceId: canonicalState.effects[0].provider_evidence,
       surfaceId: event.surfaceId,
     },

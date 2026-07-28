@@ -26,7 +26,7 @@ export const durableBoundaries = [
 ] as const;
 export type DurableBoundary = (typeof durableBoundaries)[number];
 
-function createSchema(database: DatabaseSync) {
+export function createSchema(database: DatabaseSync) {
   database.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
   createArchiveSchema(database);
   createKnowledgeSchema(database);

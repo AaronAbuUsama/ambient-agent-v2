@@ -20,8 +20,11 @@ Last updated: 2026-07-28.
 - The same recovery gate passes on merged Build 1 commit `a81e5ac`.
 - Build 2's synthetic Conversation Event crosses Archive, Scribe Attestation, Graph,
   Attention, one stable Brain Batch, one typed Brain Effect, and one synthetic Surface.
-- Runtime callers use one `createCoworker(...).admitConversationEvent(...)` application
-  boundary; the internal owner sequence is not exposed to adapters.
+- Runtime callers durably admit through
+  `createCoworker(...).admitConversationEvent(...)` without waiting for global reasoning;
+  background processing resumes through `runUntilIdle()`.
+- Internal owner and interruption helpers are absent from the package root and available only
+  from the explicit proof subpath.
 - All eight durable-boundary interruption runs converge to the same canonical database and
   one provider delivery with zero duplicate external effects.
 
@@ -34,8 +37,8 @@ Last updated: 2026-07-28.
 - Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
   `0.6.0`; emitted runtime JavaScript remains the process artifact.
 - GitHub CI passes on Build 1 PR #2.
-- GitHub CI passed on an earlier ready Build 2 PR #3 head `bb10de1`; the current refactor head
-  requires a fresh CI run, and neither is merged-commit proof.
+- GitHub CI passed on ready Build 2 PR #3 head `761c9a9`; this is exact historical PR-head
+  evidence, not merged-commit proof.
 
 ## Human-only validation
 

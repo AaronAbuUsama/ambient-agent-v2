@@ -5,8 +5,8 @@ import {
   createBrainBatchId,
   decideEffect,
   extractAttestation,
-} from "@ambient-agent/coworker";
-import type { ConversationEvent } from "@ambient-agent/coworker";
+} from "@ambient-agent/coworker/proof";
+import type { ConversationEvent } from "@ambient-agent/coworker/proof";
 
 type EvalTier = "E0" | "E1" | "E2";
 
