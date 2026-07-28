@@ -1,0 +1,23 @@
+{
+  "name": "@ambient-agent/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ambient-agent/agents": "workspace:*",
+    "@earendil-works/pi-ai": "0.81.1",
+    "@flue/runtime": "2.0.0-nightly.202607240825",
+    "hono": "4.12.32"
+  },
+  "devDependencies": {
+    "@flue/cli": "2.0.0-nightly.202607240825",
+    "@flue/vite": "2.0.0-nightly.202607240825",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2",
+    "vite": "8.1.2"
+  }
+}

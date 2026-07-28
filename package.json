@@ -7,10 +7,19 @@
   "author": "Aaron AbuUsama",
   "type": "module",
   "scripts": {
-    "check": "node scripts/check-foundation.mjs"
+    "build": "pnpm --filter @ambient-agent/runtime build",
+    "check": "node scripts/check-foundation.mjs && pnpm typecheck && pnpm test",
+    "demo:recovery": "pnpm build && node scripts/recovery-demo.mjs",
+    "test": "pnpm build && node --test tests/*.test.mjs",
+    "typecheck": "pnpm --recursive typecheck"
   },
   "engines": {
     "node": ">=22.19.0"
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "devDependencies": {
+    "@flue/sdk": "2.0.0-nightly.202607240825",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
+  }
 }
