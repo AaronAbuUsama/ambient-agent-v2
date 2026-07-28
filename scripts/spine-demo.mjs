@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 
 import {
   durableBoundaries,
+  rebuildGraph,
   readCanonicalSpineState,
   readSpineOutcome,
   runCoworkerSpine,
@@ -52,8 +54,13 @@ function fingerprint(databasePath, surface) {
 
 async function executedSourceFingerprint() {
   const digest = createHash("sha256");
+  const coworkerDist = resolve(repositoryRoot, "packages/coworker/dist");
+  const builtPaths = (await readdir(coworkerDist, { recursive: true, withFileTypes: true }))
+    .filter((entry) => entry.isFile())
+    .map((entry) => relative(repositoryRoot, resolve(entry.parentPath, entry.name)))
+    .sort();
   const paths = [
-    "packages/coworker/dist/index.js",
+    ...builtPaths,
     "scripts/spine-demo.mjs",
     "evals/src/runner.mjs",
     "evals/fixtures/synthetic-conversation.v1.json",
@@ -105,6 +112,17 @@ export async function runSpineDemo() {
     surface: baselineSurface,
   });
   const baselineFingerprint = fingerprint(baselineDatabase, baselineSurface);
+  const projectionBeforeRebuild = readCanonicalSpineState(baselineDatabase).knowledge_beliefs;
+  const projectionDatabase = new DatabaseSync(baselineDatabase);
+  projectionDatabase
+    .prepare("UPDATE knowledge_beliefs SET object = 'corrupted projection'")
+    .run();
+  projectionDatabase.close();
+  rebuildGraph(baselineDatabase);
+  assert.deepEqual(
+    readCanonicalSpineState(baselineDatabase).knowledge_beliefs,
+    projectionBeforeRebuild,
+  );
 
   const interruptionRuns = [];
   for (const boundary of durableBoundaries) {
@@ -199,6 +217,7 @@ export async function runSpineDemo() {
     },
     proof: {
       deterministicStateConvergence: true,
+      graphProjectionRebuilt: true,
       stableBrainBatchMembership: true,
       duplicateExternalEffects: 0,
     },

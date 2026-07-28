@@ -36,24 +36,37 @@ for (const law of ["packages/coworker", "packages/agents", "apps/runtime", "apps
 
 const dependencyLaws = [
   {
+    packageRoot: "packages/coworker",
     sourceRoot: "packages/coworker/src",
-    forbidden: ["@flue/", "whatsappd", "@octokit/"],
+    allowedDependencies: [],
+    allowedImports: ["node:assert/strict", "node:crypto", "node:sqlite"],
   },
   {
+    packageRoot: "packages/agents",
     sourceRoot: "packages/agents/src",
-    forbidden: ["node:sqlite", "@libsql/", "better-sqlite3", "@earendil-works/pi-ai"],
+    allowedDependencies: ["@flue/runtime"],
+    allowedImports: ["@flue/runtime"],
   },
 ];
 for (const law of dependencyLaws) {
+  const manifest = JSON.parse(await readFile(join(root, law.packageRoot, "package.json"), "utf8"));
+  assert.deepEqual(
+    Object.keys(manifest.dependencies ?? {}).sort(),
+    law.allowedDependencies,
+    `${law.packageRoot} dependency manifest violates its allowlist`,
+  );
   const files = (await readdir(join(root, law.sourceRoot), { recursive: true })).filter((path) =>
     path.endsWith(".ts"),
   );
   for (const path of files) {
     const source = await readFile(join(root, law.sourceRoot, path), "utf8");
-    for (const forbidden of law.forbidden) {
+    const imports = [...source.matchAll(/(?:from\s+|import\()["']([^"']+)["']/gu)].map(
+      (match) => match[1],
+    );
+    for (const specifier of imports) {
       assert.ok(
-        !source.includes(forbidden),
-        `${join(law.sourceRoot, path)} violates its dependency law with ${forbidden}`,
+        specifier.startsWith(".") || law.allowedImports.includes(specifier),
+        `${join(law.sourceRoot, path)} imports non-allowlisted ${specifier}`,
       );
     }
   }

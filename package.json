@@ -12,6 +12,7 @@
     "demo:spine": "pnpm build && node scripts/spine-demo.mjs",
     "demo:recovery": "pnpm build && node scripts/recovery-demo.mjs",
     "evals": "pnpm build && pnpm --filter @ambient-agent/evals eval",
+    "evals:benchmark": "pnpm build && pnpm --filter @ambient-agent/evals exec node src/runner.mjs benchmark application/deterministic",
     "test": "pnpm build && node --test tests/*.test.mjs",
     "typecheck": "pnpm --recursive typecheck"
   },

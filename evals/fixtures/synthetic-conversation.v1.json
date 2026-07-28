@@ -4,8 +4,16 @@
   "cases": [
     {
       "id": "record-investigation-request",
+      "caseVersion": "1.0.0",
       "provenance": "Sanitized from ambient-agent/tests/brain/intent-admission.test.ts at quarry commit 7e20e68",
       "tags": ["brain", "scribe", "surface:synthetic", "risk:integrity"],
+      "startingState": {},
+      "decisionBoundary": "Scribe extraction and Brain Effect selection",
+      "allowedEffects": ["say"],
+      "grader": {
+        "implementation": "exact architecture assertions",
+        "rubricVersion": "1.0.0"
+      },
       "input": {
         "id": "event_build_2",
         "surfaceId": "surface_build_2",
@@ -15,7 +23,8 @@
         "claim": "The participant requested: Please investigate this.",
         "evidenceQuote": "Please investigate this.",
         "effectType": "say",
-        "effectText": "Recorded: Please investigate this."
+        "effectText": "Recorded: Please investigate this.",
+        "invariants": ["non-empty evidence", "same Surface", "typed effect"]
       }
     }
   ]

@@ -38,6 +38,7 @@ pnpm check
 pnpm demo:recovery
 pnpm demo:spine
 pnpm evals
+pnpm evals:benchmark
 ```
 
 The proofs and E0–E2 eval floor are deterministic and require no production credentials.
