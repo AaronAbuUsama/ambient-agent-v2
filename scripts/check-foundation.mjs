@@ -38,36 +38,86 @@ const dependencyLaws = [
   {
     packageRoot: "packages/coworker",
     sourceRoot: "packages/coworker/src",
-    allowedDependencies: [],
+    allowedRuntimeDependencies: [],
     allowedImports: ["node:assert/strict", "node:crypto", "node:sqlite"],
   },
   {
     packageRoot: "packages/agents",
     sourceRoot: "packages/agents/src",
-    allowedDependencies: ["@flue/runtime"],
+    allowedRuntimeDependencies: ["@ambient-agent/coworker", "@flue/runtime"],
     allowedImports: ["@flue/runtime"],
   },
+  {
+    packageRoot: "apps/runtime",
+    sourceRoot: "apps/runtime/src",
+    allowedRuntimeDependencies: [
+      "@ambient-agent/agents",
+      "@ambient-agent/coworker",
+      "@earendil-works/pi-ai",
+      "@flue/runtime",
+      "hono",
+    ],
+    allowedImports: [
+      "@ambient-agent/agents",
+      "@ambient-agent/coworker",
+      "@earendil-works/pi-ai",
+      "@flue/runtime",
+      "hono",
+    ],
+  },
+  {
+    packageRoot: "evals",
+    sourceRoot: "evals/src",
+    allowedRuntimeDependencies: ["@ambient-agent/coworker", "braintrust"],
+    allowedImports: [
+      "@ambient-agent/coworker",
+      "braintrust",
+      "node:fs/promises",
+      "node:url",
+    ],
+  },
 ];
+const runtimeDependencyBuckets = ["dependencies", "optionalDependencies", "peerDependencies"];
+const importPatterns = [
+  /(?:import|export)\s+(?:type\s+)?(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/gu,
+  /import\s*\(\s*["']([^"']+)["']\s*\)/gu,
+];
+const packageName = (specifier) =>
+  specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/", 1)[0];
+
 for (const law of dependencyLaws) {
   const manifest = JSON.parse(await readFile(join(root, law.packageRoot, "package.json"), "utf8"));
-  assert.deepEqual(
-    Object.keys(manifest.dependencies ?? {}).sort(),
-    law.allowedDependencies,
-    `${law.packageRoot} dependency manifest violates its allowlist`,
+  const runtimeDependencies = new Set(
+    runtimeDependencyBuckets.flatMap((bucket) => Object.keys(manifest[bucket] ?? {})),
   );
+  for (const dependency of runtimeDependencies) {
+    assert.ok(
+      law.allowedRuntimeDependencies.includes(dependency),
+      `${law.packageRoot} runtime dependency ${dependency} violates its allowlist`,
+    );
+  }
   const files = (await readdir(join(root, law.sourceRoot), { recursive: true })).filter((path) =>
-    path.endsWith(".ts"),
+    /\.(?:mjs|ts)$/u.test(path),
   );
   for (const path of files) {
     const source = await readFile(join(root, law.sourceRoot, path), "utf8");
-    const imports = [...source.matchAll(/(?:from\s+|import\()["']([^"']+)["']/gu)].map(
-      (match) => match[1],
+    const imports = importPatterns.flatMap((pattern) =>
+      [...source.matchAll(pattern)].map((match) => match[1]),
     );
     for (const specifier of imports) {
       assert.ok(
-        specifier.startsWith(".") || law.allowedImports.includes(specifier),
+        specifier.startsWith(".") ||
+          law.allowedImports.some(
+            (allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`),
+          ),
         `${join(law.sourceRoot, path)} imports non-allowlisted ${specifier}`,
       );
+      if (!specifier.startsWith(".") && !specifier.startsWith("node:")) {
+        assert.ok(
+          runtimeDependencies.has(packageName(specifier)),
+          `${join(law.sourceRoot, path)} imports undeclared runtime dependency ${specifier}`,
+        );
+      }
     }
   }
 }

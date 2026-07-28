@@ -3,6 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { ConversationEvent } from "./archive.js";
 import { stableId } from "./ids.js";
 import type { AttestationId, BeliefId, ConversationEventId } from "./ids.js";
+import { immediateTransaction } from "./transaction.js";
 
 export interface Attestation {
   id: AttestationId;
@@ -103,20 +104,17 @@ export function projectAttestation(database: DatabaseSync, attestation: Attestat
 export function rebuildGraph(databasePath: string) {
   const database = new DatabaseSync(databasePath);
   try {
-    database.exec("BEGIN IMMEDIATE");
-    database.exec("DELETE FROM knowledge_beliefs");
-    const rows = database
-      .prepare(
-        `SELECT a.id AS attestation_id, e.surface_id, a.evidence_quote
-         FROM knowledge_attestations a JOIN archive_events e ON e.id = a.evidence_event_id
-         ORDER BY a.id`,
-      )
-      .all() as Array<{ attestation_id: string; surface_id: string; evidence_quote: string }>;
-    for (const row of rows) insertBelief(database, row);
-    database.exec("COMMIT");
-  } catch (error) {
-    database.exec("ROLLBACK");
-    throw error;
+    immediateTransaction(database, () => {
+      database.exec("DELETE FROM knowledge_beliefs");
+      const rows = database
+        .prepare(
+          `SELECT a.id AS attestation_id, e.surface_id, a.evidence_quote
+           FROM knowledge_attestations a JOIN archive_events e ON e.id = a.evidence_event_id
+           ORDER BY a.id`,
+        )
+        .all() as Array<{ attestation_id: string; surface_id: string; evidence_quote: string }>;
+      for (const row of rows) insertBelief(database, row);
+    });
   } finally {
     database.close();
   }

@@ -1,0 +1,31 @@
+{
+  "dataset": "generated-invariants",
+  "version": "1.0.0",
+  "tier": "E0",
+  "cases": [
+    {
+      "id": "reject-empty-evidence",
+      "caseVersion": "1.0.0",
+      "provenance": "Build 2 application invariant",
+      "tags": ["scribe", "risk:integrity", "difficulty:floor"],
+      "startingState": {},
+      "decisionBoundary": "Scribe admission",
+      "allowedEffects": [],
+      "grader": {
+        "implementation": "rejection assertion",
+        "rubricVersion": "1.0.0"
+      },
+      "input": {
+        "id": "event_empty",
+        "surfaceId": "surface_eval",
+        "text": " "
+      },
+      "expected": {
+        "acceptableOutcomes": ["reject-invalid-observation"],
+        "forbiddenOutcomes": ["create-attestation-with-empty-evidence"],
+        "invariants": ["Attestations require non-empty evidence"],
+        "errorPattern": "required"
+      }
+    }
+  ]
+}

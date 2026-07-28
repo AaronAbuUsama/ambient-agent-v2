@@ -1,6 +1,7 @@
 {
   "dataset": "brain-curated",
   "version": "1.0.0",
+  "tier": "E2",
   "cases": [
     {
       "id": "acknowledge-explicit-memory-request",

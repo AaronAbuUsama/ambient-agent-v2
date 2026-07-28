@@ -12,6 +12,7 @@ import {
   projectAttestation,
   recordAttestation,
 } from "./knowledge.js";
+import { immediateTransaction } from "./transaction.js";
 
 export const durableBoundaries = [
   "archive-committed",
@@ -111,18 +112,13 @@ export async function runCoworkerSpine(options: {
     if (status === "pending") {
       const delivery = await options.surface.deliver(effect);
       interrupt("provider-accepted");
-      database.exec("BEGIN IMMEDIATE");
-      try {
+      immediateTransaction(database, () => {
         database
           .prepare("UPDATE effects SET status = 'completed', provider_evidence = ? WHERE id = ?")
           .run(delivery.providerEvidence, effect.id);
         database.prepare("UPDATE attention_items SET status = 'settled' WHERE id = ?").run(attentionId);
         database.prepare("UPDATE brain_batches SET status = 'settled' WHERE id = ?").run(batchId);
-        database.exec("COMMIT");
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+      });
     }
     interrupt("settlement-recorded");
     return { batchId, effectId: effect.id, outcome: readSpineOutcome(options.databasePath) };

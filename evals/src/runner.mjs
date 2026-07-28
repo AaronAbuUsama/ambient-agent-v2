@@ -1,13 +1,20 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
-import { decideEffect, extractAttestation } from "@ambient-agent/coworker";
+import {
+  createBrainBatchId,
+  decideEffect,
+  extractAttestation,
+} from "@ambient-agent/coworker";
 
+const generatedPath = fileURLToPath(
+  new URL("../fixtures/generated-invariants.v1.json", import.meta.url),
+);
 const fixturePath = fileURLToPath(
   new URL("../fixtures/synthetic-conversation.v1.json", import.meta.url),
 );
 const curatedPath = fileURLToPath(new URL("../fixtures/brain-curated.v1.json", import.meta.url));
-const datasetPaths = [fixturePath, curatedPath];
+const datasetPaths = [generatedPath, fixturePath, curatedPath];
 
 async function loadDatasets() {
   return Promise.all(datasetPaths.map((path) => readFile(path, "utf8").then(JSON.parse)));
@@ -17,6 +24,7 @@ export async function listCases() {
   const datasets = await loadDatasets();
   return datasets.flatMap((dataset) =>
     dataset.cases.map(({ id, provenance, tags }) => ({
+      tier: dataset.tier,
       dataset: dataset.dataset,
       version: dataset.version,
       id,
@@ -26,9 +34,54 @@ export async function listCases() {
   );
 }
 
-function evaluateCase(testCase) {
+function completeCase(testCase, startedAt, evaluation) {
+  return {
+    id: testCase.id,
+    caseVersion: testCase.caseVersion,
+    provenance: testCase.provenance,
+    tags: testCase.tags,
+    startingState: testCase.startingState,
+    decisionBoundary: testCase.decisionBoundary,
+    allowedEffects: testCase.allowedEffects,
+    grader: testCase.grader,
+    input: testCase.input,
+    expected:
+      testCase.expected ??
+      { acceptableOutcomes: testCase.acceptable, forbiddenOutcomes: testCase.forbidden },
+    durationMs: performance.now() - startedAt,
+    tokens: null,
+    costUsd: null,
+    traceIds: [],
+    ...evaluation,
+  };
+}
+
+function evaluateGeneratedCase(testCase) {
+  const startedAt = performance.now();
+  let errorMessage = "";
+  try {
+    extractAttestation(testCase.input);
+  } catch (error) {
+    errorMessage = String(error);
+  }
+  const assertions = {
+    rejected: errorMessage.length > 0,
+    expectedError: new RegExp(testCase.expected.errorPattern).test(errorMessage),
+  };
+  return completeCase(testCase, startedAt, {
+    passed: Object.values(assertions).every(Boolean),
+    assertions,
+    output: {
+      outcome: errorMessage ? "reject-invalid-observation" : "attestation-created",
+      error: errorMessage || null,
+    },
+  });
+}
+
+function evaluateRecordedCase(testCase) {
+  const startedAt = performance.now();
   const attestation = extractAttestation(testCase.input);
-  const effect = decideEffect(testCase.input, "batch_eval");
+  const effect = decideEffect(testCase.input, createBrainBatchId("eval", testCase.id));
   const assertions = {
     claim: attestation.claim === testCase.expected.claim,
     evidence: attestation.evidenceQuote === testCase.expected.evidenceQuote,
@@ -36,17 +89,16 @@ function evaluateCase(testCase) {
     effectType: effect.type === testCase.expected.effectType,
     effectText: effect.text === testCase.expected.effectText,
   };
-  return {
-    id: testCase.id,
+  return completeCase(testCase, startedAt, {
     passed: Object.values(assertions).every(Boolean),
     assertions,
     output: { attestation, effect },
-    expected: testCase.expected,
-  };
+  });
 }
 
 function evaluateCuratedCase(testCase) {
-  const effect = decideEffect(testCase.input, "batch_curated");
+  const startedAt = performance.now();
+  const effect = decideEffect(testCase.input, createBrainBatchId("curated", testCase.id));
   const normalizedText = effect.text.toLowerCase();
   const rubric = {
     allowedEffect: testCase.acceptable.effectTypes.includes(effect.type),
@@ -56,69 +108,53 @@ function evaluateCuratedCase(testCase) {
     ),
     forbiddenEffect: !testCase.forbidden.effectTypes.includes(effect.type),
   };
-  return {
-    id: testCase.id,
+  return completeCase(testCase, startedAt, {
     passed: Object.values(rubric).every(Boolean),
     rubric,
     output: effect,
-  };
+  });
+}
+
+function executeCase(dataset, testCase) {
+  if (dataset.tier === "E0") return evaluateGeneratedCase(testCase);
+  if (dataset.tier === "E1") return evaluateRecordedCase(testCase);
+  if (dataset.tier === "E2") return evaluateCuratedCase(testCase);
+  throw new Error(`Unknown eval tier: ${dataset.tier}`);
 }
 
 export async function runCase(caseId) {
-  const [fixture, curated] = await loadDatasets();
-  const recordedCase = fixture.cases.find(({ id }) => id === caseId);
-  if (recordedCase) return evaluateCase(recordedCase);
-  const curatedCase = curated.cases.find(({ id }) => id === caseId);
-  if (curatedCase) return evaluateCuratedCase(curatedCase);
+  const datasets = await loadDatasets();
+  for (const dataset of datasets) {
+    const testCase = dataset.cases.find(({ id }) => id === caseId);
+    if (testCase) {
+      return {
+        tier: dataset.tier,
+        dataset: dataset.dataset,
+        version: dataset.version,
+        ...executeCase(dataset, testCase),
+      };
+    }
+  }
   throw new Error(`Unknown eval case: ${caseId}`);
 }
 
 export async function runDeterministicEvals() {
-  const E0Case = {
-    id: "reject-empty-evidence",
-    caseVersion: "1.0.0",
-    provenance: "Build 2 application invariant",
-    tags: ["scribe", "risk:integrity"],
-    startingState: {},
-    decisionBoundary: "Scribe admission",
-    allowedEffects: [],
-    grader: { implementation: "assert.throws", rubricVersion: "1.0.0" },
-  };
-  const rejectedEmptyEvidence = (() => {
-    try {
-      extractAttestation({ id: "event_empty", surfaceId: "surface_eval", text: " " });
-      return false;
-    } catch (error) {
-      return /required/.test(String(error));
-    }
-  })();
-  const E0 = {
-    dataset: "generated-invariants",
-    version: "1.0.0",
-    passed: rejectedEmptyEvidence,
-    cases: 1,
-    results: [{ ...E0Case, passed: rejectedEmptyEvidence }],
-  };
-
-  const [fixture, curated] = await loadDatasets();
-  const results = fixture.cases.map(evaluateCase);
-  const E1 = {
-    dataset: fixture.dataset,
-    version: fixture.version,
-    passed: results.every(({ passed }) => passed),
-    cases: results.length,
-    results,
-  };
-
-  const curatedResults = curated.cases.map(evaluateCuratedCase);
-  const E2 = {
-    dataset: curated.dataset,
-    version: curated.version,
-    passed: curatedResults.every(({ passed }) => passed),
-    cases: curatedResults.length,
-    results: curatedResults,
-  };
-  return { E0, E1, E2 };
+  const datasets = await loadDatasets();
+  return Object.fromEntries(
+    datasets.map((dataset) => {
+      const results = dataset.cases.map((testCase) => executeCase(dataset, testCase));
+      return [
+        dataset.tier,
+        {
+          dataset: dataset.dataset,
+          version: dataset.version,
+          passed: results.every(({ passed }) => passed),
+          cases: results.length,
+          results,
+        },
+      ];
+    }),
+  );
 }
 
 const candidates = {
@@ -137,8 +173,13 @@ export async function runBenchmark(candidateIds = ["application/deterministic"])
       repetitions: 1,
       durationMs: performance.now() - startedAt,
       deterministicPassRate: [evals.E0, evals.E1, evals.E2].every(({ passed }) => passed) ? 1 : 0,
-      pairedResults: [evals.E0, evals.E1, evals.E2].flatMap(({ results }) =>
-        results.map(({ id, passed }) => ({ caseId: id, passed })),
+      pairedResults: Object.entries(evals).flatMap(([tier, suite]) =>
+        suite.results.map((result) => ({
+          tier,
+          dataset: suite.dataset,
+          datasetVersion: suite.version,
+          ...result,
+        })),
       ),
       tokens: null,
       costUsd: null,
@@ -153,39 +194,94 @@ export async function runBenchmark(candidateIds = ["application/deterministic"])
   };
 }
 
+function normalizeCase(result, context = {}) {
+  const checks = result.assertions ?? result.rubric ?? {};
+  return {
+    id: `${context.candidateId ? `${context.candidateId}:` : ""}${context.dataset}:${result.id}`,
+    input: {
+      candidateId: context.candidateId,
+      dataset: context.dataset,
+      datasetVersion: context.datasetVersion,
+      caseId: result.id,
+      caseVersion: result.caseVersion,
+      sourceObservation: result.input,
+      startingState: result.startingState,
+      decisionBoundary: result.decisionBoundary,
+      allowedEffects: result.allowedEffects,
+      expected: result.expected,
+      provenance: result.provenance,
+      tags: result.tags,
+      grader: result.grader,
+    },
+    output: result.output,
+    scores: {
+      passed: result.passed ? 1 : 0,
+      ...Object.fromEntries(
+        Object.entries(checks)
+          .filter(([, value]) => typeof value === "boolean")
+          .map(([name, value]) => [name, value ? 1 : 0]),
+      ),
+    },
+    metadata: {
+      tier: context.tier,
+      durationMs: result.durationMs,
+      tokens: result.tokens,
+      costUsd: result.costUsd,
+      traceIds: result.traceIds,
+      candidateDurationMs: context.candidateDurationMs,
+    },
+  };
+}
+
+export function normalizeBraintrustRows(report) {
+  if (report.candidates) {
+    return report.candidates.flatMap((candidate) =>
+      candidate.pairedResults.map((result) =>
+        normalizeCase(result, {
+          candidateId: candidate.candidateId,
+          tier: result.tier,
+          dataset: result.dataset,
+          datasetVersion: result.datasetVersion,
+          candidateDurationMs: candidate.durationMs,
+        }),
+      ),
+    );
+  }
+  if (report.E0) {
+    return Object.entries(report).flatMap(([tier, suite]) =>
+      suite.results.map((result) =>
+        normalizeCase(result, {
+          tier,
+          dataset: suite.dataset,
+          datasetVersion: suite.version,
+        }),
+      ),
+    );
+  }
+  if (report.id && report.dataset) {
+    return [
+      normalizeCase(report, {
+        tier: report.tier,
+        dataset: report.dataset,
+        datasetVersion: report.version,
+      }),
+    ];
+  }
+  throw new Error("Unsupported Braintrust report shape");
+}
+
 export async function publishToBraintrust(report) {
   if (!process.env.BRAINTRUST_API_KEY) {
     return { published: false, reason: "BRAINTRUST_API_KEY is not set" };
   }
   const { init } = await import("braintrust");
-  const rows = report.candidates
-    ? report.candidates.flatMap((candidate) =>
-        candidate.pairedResults.map((result) => ({
-          id: `${candidate.candidateId}:${result.caseId}`,
-          input: { candidateId: candidate.candidateId, caseId: result.caseId },
-          output: result,
-          scores: { passed: result.passed ? 1 : 0 },
-          metadata: {
-            durationMs: candidate.durationMs,
-            tokens: candidate.tokens,
-            costUsd: candidate.costUsd,
-            traceIds: candidate.traceIds,
-          },
-        })),
-      )
-    : [report.E0, report.E1, report.E2].flatMap((tier) =>
-        tier.results.map((result) => ({
-          id: `${tier.dataset}:${result.id}`,
-          input: { dataset: tier.dataset, caseId: result.id },
-          output: result.output ?? result,
-          scores: { passed: result.passed ? 1 : 0 },
-          metadata: { datasetVersion: tier.version },
-        })),
-      );
+  const rows = normalizeBraintrustRows(report);
   const experiment = init("Ambient Agent v2", {
     apiKey: process.env.BRAINTRUST_API_KEY,
     experiment: `build-2-${Date.now()}`,
-    metadata: { reportKind: report.candidates ? "benchmark" : "E0/E1/E2" },
+    metadata: {
+      reportKind: report.candidates ? "benchmark" : report.E0 ? "E0/E1/E2" : "single-case",
+    },
   });
   for (const row of rows) {
     experiment.log({

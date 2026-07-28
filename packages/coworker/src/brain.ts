@@ -1,8 +1,9 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import type { ConversationEvent } from "./archive.js";
-import { stableId } from "./ids.js";
+import { createBrainBatchId, stableId } from "./ids.js";
 import type { AttentionId, BrainBatchId, EffectId } from "./ids.js";
+import { immediateTransaction } from "./transaction.js";
 
 export interface BrainEffect {
   id: EffectId;
@@ -33,25 +34,20 @@ export function createBrainSchema(database: DatabaseSync) {
 }
 
 export function claimBatch(database: DatabaseSync, attentionId: AttentionId) {
-  const batchId = stableId<"BrainBatchId">("batch", attentionId) as BrainBatchId;
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  const batchId = createBrainBatchId(attentionId);
+  return immediateTransaction(database, () => {
     database.prepare("INSERT OR IGNORE INTO brain_batches (id, status) VALUES (?, 'open')").run(batchId);
     database
       .prepare("INSERT OR IGNORE INTO brain_batch_members (batch_id, attention_id) VALUES (?, ?)")
       .run(batchId, attentionId);
-    database.exec("COMMIT");
     return batchId;
-  } catch (error) {
-    database.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
-export function decideEffect(event: ConversationEvent, batchId: BrainBatchId | string): BrainEffect {
+export function decideEffect(event: ConversationEvent, batchId: BrainBatchId): BrainEffect {
   return {
     id: stableId<"EffectId">("effect", batchId, event.surfaceId, event.text) as EffectId,
-    batchId: batchId as BrainBatchId,
+    batchId,
     type: "say",
     surfaceId: event.surfaceId,
     text: `Recorded: ${event.text.trim()}`,

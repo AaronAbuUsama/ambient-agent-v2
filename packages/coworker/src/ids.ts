@@ -17,3 +17,7 @@ export function stableId<Name extends string>(
   const digest = createHash("sha256").update(parts.join("\u0000")).digest("hex").slice(0, 24);
   return `${prefix}_${digest}` as Brand<Name>;
 }
+
+export function createBrainBatchId(...parts: string[]): BrainBatchId {
+  return stableId<"BrainBatchId">("batch", ...parts);
+}

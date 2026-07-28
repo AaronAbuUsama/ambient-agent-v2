@@ -1,6 +1,7 @@
 {
   "dataset": "synthetic-conversation",
   "version": "1.0.0",
+  "tier": "E1",
   "cases": [
     {
       "id": "record-investigation-request",
