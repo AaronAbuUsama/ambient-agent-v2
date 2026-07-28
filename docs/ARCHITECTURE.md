@@ -73,7 +73,7 @@ ambient-agent-v2/
 
 ```text
 packages/coworker  -> Node/SQL primitives only
-packages/agents    -> Flue + packages/coworker
+packages/agents    -> Flue + schema validation + packages/coworker
 apps/runtime       -> packages/* + WhatsApp/GitHub/database adapters
 apps/control-plane -> provisioning contracts over the network
 ```

@@ -193,10 +193,6 @@ export async function runRealModelDemo() {
     ),
   );
   assert.deepEqual(Object.keys(reasoningOutputs).sort(), [...roles].sort());
-  const speakerText = (reasoningOutputs.speaker as { text: string }).text;
-  for (const forbidden of ["att_", "event_build_", "scribe", "confidence", "2026"]) {
-    assert.equal(speakerText.toLowerCase().includes(forbidden.toLowerCase()), false);
-  }
 
   const database = new DatabaseSync(databasePath);
   database.exec("PRAGMA wal_checkpoint(TRUNCATE)");
@@ -225,6 +221,32 @@ export async function runRealModelDemo() {
   };
   assert.deepEqual(outcome, expectedOutcome);
   const canonicalState = readCanonicalSpineState(databasePath);
+  const speakerText = (reasoningOutputs.speaker as { text: string }).text;
+  const forbiddenSpeakerFragments = [
+    input.id,
+    input.surfaceId,
+    canonicalState.knowledge_attestations[0].id,
+    canonicalState.attention_items[0].id,
+    canonicalState.brain_batches[0].id,
+    canonicalState.effects[0].id,
+    canonicalState.effects[0].provider_evidence,
+    "scribe",
+    "brain",
+    "speaker",
+    "confidence",
+    "model",
+  ];
+  const leakedSpeakerFragments = forbiddenSpeakerFragments.filter((fragment) =>
+    speakerText.toLowerCase().includes(String(fragment).toLowerCase()),
+  );
+  const unstatedSpeakerFragments = ["2026"].filter((fragment) =>
+    speakerText.includes(fragment),
+  );
+  assert.deepEqual(leakedSpeakerFragments, []);
+  assert.deepEqual(unstatedSpeakerFragments, []);
+  const databaseBytes = await readFile(databasePath);
+  const credentialInDatabase = databaseBytes.includes(Buffer.from(apiKey));
+  assert.equal(credentialInDatabase, false);
 
   const commit = spawnSync("git", ["rev-parse", "HEAD"], {
     cwd: repositoryRoot,
@@ -273,7 +295,7 @@ export async function runRealModelDemo() {
     },
     artifacts: {
       database: relative(repositoryRoot, databasePath),
-      databaseSha256: createHash("sha256").update(await readFile(databasePath)).digest("hex"),
+      databaseSha256: createHash("sha256").update(databaseBytes).digest("hex"),
       executedSourceSha256: await sourceFingerprint(),
       receipt: relative(repositoryRoot, receiptPath),
     },
@@ -283,7 +305,7 @@ export async function runRealModelDemo() {
       realBrainInference: true,
       realSpeakerInference: true,
       trustedApplicationValidation: true,
-      noInternalMetadataLeak: true,
+      noKnownInternalMetadataInSpeakerOutput: leakedSpeakerFragments.length === 0,
       duplicateExternalEffects: 0,
     },
     assertions: {
@@ -294,9 +316,10 @@ export async function runRealModelDemo() {
       expectedOutcome: JSON.stringify(outcome) === JSON.stringify(expectedOutcome),
     },
     negativeAssertions: {
-      duplicateSurfaceDeliveries: outcome.duplicateProviderDeliveries === 0,
-      internalMetadataLeak: false,
-      credentialPersisted: false,
+      noDuplicateSurfaceDeliveries: outcome.duplicateProviderDeliveries === 0,
+      noKnownInternalMetadataInSpeakerOutput: leakedSpeakerFragments.length === 0,
+      noUnstatedYearInSpeakerOutput: unstatedSpeakerFragments.length === 0,
+      noCredentialInFinalizedDatabase: !credentialInDatabase,
     },
     notProven: [
       "model-output replay across a process interruption",
@@ -307,8 +330,18 @@ export async function runRealModelDemo() {
       "multi-tenant isolation",
     ],
   };
-  const serializedReceipt = JSON.stringify(receipt, null, 2);
+  const serializedWithoutReceiptAssertion = JSON.stringify(receipt, null, 2);
+  const noCredentialInReceipt = !serializedWithoutReceiptAssertion.includes(apiKey);
+  assert.equal(noCredentialInReceipt, true);
+  const finalReceipt = {
+    ...receipt,
+    negativeAssertions: {
+      ...receipt.negativeAssertions,
+      noCredentialInReceipt,
+    },
+  };
+  const serializedReceipt = JSON.stringify(finalReceipt, null, 2);
   assert.equal(serializedReceipt.includes(apiKey), false);
   await writeFile(receiptPath, `${serializedReceipt}\n`);
-  return receipt;
+  return finalReceipt;
 }

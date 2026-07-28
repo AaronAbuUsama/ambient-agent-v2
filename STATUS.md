@@ -34,8 +34,9 @@ Last updated: 2026-07-28.
 - Clean implementation commit `08e74a4` ran one synthetic Conversation Event through real
   OpenCode Go `glm-5.1` inference for the global Scribe, one Brain, and one Speaker.
 - Each role produced schema-validated structured output and real provider response IDs with
-  non-zero token usage. The final Speaker output contained no internal IDs, model roles,
-  confidence scores, or invented date.
+  non-zero token usage. The observed Speaker output contained none of the persisted
+  application identities or role/implementation markers checked by the proof, and did not
+  add the unstated year `2026`.
 - Trusted Coworker code assigned the durable Attestation, Attention, Brain Batch, and Effect
   identities, then settled one synthetic Surface delivery with zero duplicates.
 - The ignored local receipt is

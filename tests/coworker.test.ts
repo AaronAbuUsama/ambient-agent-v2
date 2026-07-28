@@ -6,7 +6,11 @@ import test from "node:test";
 
 import { createCoworker } from "@ambient-agent/coworker";
 import type { SurfaceDeliveryPort } from "@ambient-agent/coworker";
-import { createAttestation, normalizeConversationEvent } from "@ambient-agent/coworker/proof";
+import {
+  createAttestation,
+  normalizeConversationEvent,
+  syntheticReasoner,
+} from "@ambient-agent/coworker/proof";
 
 test("the application rejects a Scribe quote absent from its source event", () => {
   const event = normalizeConversationEvent({
@@ -31,22 +35,7 @@ test("the Coworker admits one Conversation Event through one public interface", 
   try {
     const coworker = createCoworker({
       databasePath: join(directory, "tenant.sqlite"),
-      reasoner: {
-        attestationAuthor: "scribe:synthetic",
-        async scribe(event) {
-          return {
-            claim: `The participant requested: ${event.text}`,
-            confidence: 1,
-            evidenceQuote: event.text,
-          };
-        },
-        async brain({ event }) {
-          return { type: "say", objective: `Record the participant request: ${event.text}` };
-        },
-        async speaker({ event }) {
-          return `Recorded: ${event.text}`;
-        },
-      },
+      reasoner: syntheticReasoner,
       surface: {
         async deliver(effect) {
           deliveries.push(effect);

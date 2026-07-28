@@ -10,7 +10,7 @@ test(
     const receipt = await runRealModelDemo();
 
     assert.equal(receipt.proof.realModelInference, true);
-    assert.equal(receipt.proof.noInternalMetadataLeak, true);
+    assert.equal(receipt.proof.noKnownInternalMetadataInSpeakerOutput, true);
     assert.deepEqual(
       receipt.modelCalls.map(({ role }) => role),
       ["scribe", "brain", "speaker"],
