@@ -39,6 +39,19 @@ Last updated: 2026-07-28.
   hashes to `9a1173990a9a64532b6e20accc08d7648c27c46610d4f2196e4b178d2ffaea60`.
 - This Build 3.1 receipt is local P2 only. It does not prove process-interruption recovery,
   real WhatsApp normalization, or external delivery.
+- Build 3.2's `pnpm demo:delivery` passed locally on clean commit `036e9bf`. Its sent path
+  recorded provider evidence; its failed and indeterminate-call paths each created new
+  delivery-sourced Attention; and restart from durable `attempting` became `uncertain` without
+  invoking the provider.
+- The ignored local receipt is
+  `receipts/build-3-2/2026-07-28T15-41-53.900Z/receipt.json`. Its sent, failed, uncertain, and
+  interrupted SQLite artifacts respectively hash to
+  `a583fe75c8f3844f024181f28fd0dda488cc5e3162ab7e11a3217b0d4d77adb5`,
+  `d8830a8cdd12273c3a55eb4b2f154ef08e208cfb03975fe80db95312899a25d8`,
+  `f80dd63dc60a3efe1b1b4410da761b2cf4c7d8aa34d9c8cff4f81945dc75287c`, and
+  `c97ea5a124c73f8bc999b02b62279470334516a363416bca9a1991d23c1916e8`.
+- This is a synthetic local P3 state-machine proof. It does not prove real WhatsApp delivery,
+  provider reconciliation of uncertainty, or OS process termination during a provider call.
 
 ## Externally proven (local P4)
 
@@ -64,6 +77,8 @@ Last updated: 2026-07-28.
 - `pnpm check` validates repository canon and runs typecheck, build, both proofs, and evals.
 - `pnpm check` passed on merged Build 3.1 commit `71aaaec`, including the prior-schema
   migration regression and the normalized-intake receipt test.
+- `pnpm check` passed on Build 3.2 implementation commit `036e9bf`, including legacy delivery
+  evidence migration, the four delivery outcomes, and the updated interruption matrix.
 - Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
   `0.6.0`; emitted runtime JavaScript remains the process artifact.
 - Credential-free CI skips the opt-in real-model test explicitly; the P4 command is local and
@@ -82,8 +97,8 @@ Last updated: 2026-07-28.
 
 ## Designed, not built
 
-- Build 3.2–3.5: uncertain-safe delivery, durable Brain/Speaker identity, thin WhatsApp
-  adapter, and live local/staging/human proof.
+- Build 3.3–3.5: durable Brain/Speaker identity, thin WhatsApp adapter, and live
+  local/staging/human proof.
 - Build 4: GitHub work loop.
 - Build 5: hosted tenant isolation and control plane.
 - Production replacement and data/identity cutover.
@@ -98,5 +113,5 @@ Last updated: 2026-07-28.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-Build 3.1 is implemented, exact-head CI-green, merged, and locally P2-proven on merged commit
-`71aaaec`. Build 3.2 is the legal frontier.
+Build 3.2 is implemented and synthetically P3-proven on `036e9bf`, but its final-head CI, PR
+merge, and merged-commit proof are pending. Build 3.3 is not yet the legal frontier.
