@@ -20,14 +20,25 @@ Last updated: 2026-07-28.
 - The same recovery gate passes on merged Build 1 commit `a81e5ac`.
 - Build 2's synthetic Conversation Event crosses Archive, Scribe Attestation, Graph,
   Attention, one stable Brain Batch, one typed Brain Effect, and one synthetic Surface.
-- Runtime callers durably admit through
-  `createCoworker(...).admitConversationEvent(...)` without waiting for global reasoning;
-  background processing resumes through `runUntilIdle()`.
+- Build 3.1 replaces the proof-shaped admission call with
+  `bindSurface(...)` and `observeConversationEvent(...)`. Observation durably archives every
+  normalized event; only a useful live inbound arrival already bound to an active Surface
+  creates Attention. Background processing remains separate through `runUntilIdle()`.
 - Internal owner and interruption helpers are absent from the package root and available only
   from the explicit proof subpath.
 - All eight durable-boundary interruption runs converge to the same canonical database and
   one provider delivery with zero duplicate external effects.
 - The same Build 2 spine gate passes on merged commit `7b581ba`.
+- Build 3.1's `pnpm demo:intake` passed locally on clean commit `124f59f`. Its receipt archived
+  one authorized arrival plus seven archive-only cases (unauthorized arrival, outbound
+  arrival, empty inbound arrival, edit, revocation, reaction, and receipt), created exactly
+  one Attention item, invoked no reasoner or Surface delivery, and persisted no supplied raw
+  provider envelope.
+- The ignored local receipt is
+  `receipts/build-3-1/2026-07-28T14-45-22.083Z/receipt.json`; its finalized SQLite artifact
+  hashes to `5b85c88cc77e091172d566815491190a28f1af9a4420584a6b317942ab233220`.
+- This Build 3.1 receipt is local P2 only. It does not prove process-interruption recovery,
+  real WhatsApp normalization, or external delivery.
 
 ## Externally proven (local P4)
 
@@ -51,6 +62,8 @@ Last updated: 2026-07-28.
 - `pnpm test` builds the artifacts and passes the Flue recovery and synthetic-spine scenarios.
 - `pnpm evals` passes generated-invariant E0, recorded-fixture E1, and curated-rubric E2.
 - `pnpm check` validates repository canon and runs typecheck, build, both proofs, and evals.
+- `pnpm check` passed on Build 3.1 implementation commit `124f59f`, including the prior-schema
+  migration regression and the normalized-intake receipt test.
 - Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
   `0.6.0`; emitted runtime JavaScript remains the process artifact.
 - Credential-free CI skips the opt-in real-model test explicitly; the P4 command is local and
@@ -67,7 +80,8 @@ Last updated: 2026-07-28.
 
 ## Designed, not built
 
-- Build 3: live WhatsApp coworker.
+- Build 3.2–3.5: uncertain-safe delivery, durable Brain/Speaker identity, thin WhatsApp
+  adapter, and live local/staging/human proof.
 - Build 4: GitHub work loop.
 - Build 5: hosted tenant isolation and control plane.
 - Production replacement and data/identity cutover.
@@ -75,12 +89,12 @@ Last updated: 2026-07-28.
 ## Not proven / explicitly absent
 
 - No WhatsApp or GitHub integration.
+- No interruption/restart proof for normalized Conversation Intake.
 - No model-output replay proof across a process interruption.
 - No Braintrust publication; its adapter is opt-in and unproven.
 - No provider or Braintrust credential is committed or available to CI.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-Build 3A's final-head CI, PR merge, and merged-commit external proof are complete. Build 3 is
-now the legal implementation step defined in
-[`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
+Build 3.1 is implemented and locally P2-proven on `124f59f`, but its final-head CI, PR merge,
+and merged-commit proof are pending. Build 3.2 is not yet the legal frontier.
