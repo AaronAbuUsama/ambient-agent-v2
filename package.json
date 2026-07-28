@@ -1,0 +1,16 @@
+{
+  "name": "ambient-agent-v2",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Clean replacement implementation of the Ambient Agent coworker.",
+  "license": "MIT",
+  "author": "Aaron AbuUsama",
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check-foundation.mjs"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "packageManager": "pnpm@9.15.9"
+}
