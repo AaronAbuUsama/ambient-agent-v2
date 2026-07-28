@@ -29,7 +29,8 @@ Last updated: 2026-07-28.
 - `pnpm evals` passes generated-invariant E0, recorded-fixture E1, and curated-rubric E2.
 - `pnpm check` enforces dependency laws and runs typecheck, build, both proofs, and evals.
 - GitHub CI passes on Build 1 PR #2.
-- Build 2 CI remains pending until its PR is pushed.
+- GitHub CI passed on ready Build 2 PR #3 at head `bb10de1`; this is PR-head mechanical
+  evidence, not merged-commit proof.
 
 ## Human-only validation
 
@@ -51,6 +52,6 @@ Last updated: 2026-07-28.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-The next stage boundary is the Build 2 ready PR, CI, merge, and merged-commit spine proof.
+The next stage boundary is final-head CI, merge, and a merged-commit Build 2 spine proof.
 Only then is Build 3 the legal implementation step defined in
 [`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).

@@ -201,6 +201,7 @@ export async function runSpineDemo() {
       attentionId: canonicalState.attention_items[0].id,
       brainBatchId: baselineRun.batchId,
       effectId: baselineRun.effectId,
+      providerEvidenceId: canonicalState.effects[0].provider_evidence,
       surfaceId: event.surfaceId,
     },
     outcome,

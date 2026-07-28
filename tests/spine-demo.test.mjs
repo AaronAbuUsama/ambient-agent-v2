@@ -26,4 +26,5 @@ test("the synthetic Coworker spine converges after every durable interruption", 
   assert.equal(receipt.evals.E0.passed, true);
   assert.equal(receipt.evals.E1.passed, true);
   assert.equal(receipt.evals.E2.passed, true);
+  assert.equal(receipt.identities.providerEvidenceId, `synthetic:${receipt.identities.effectId}`);
 });

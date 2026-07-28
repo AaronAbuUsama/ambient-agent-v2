@@ -9,6 +9,14 @@ export interface ConversationEvent {
   text: string;
 }
 
+export function normalizeConversationEvent(event: ConversationEvent): ConversationEvent {
+  const text = event.text.trim();
+  if (!event.id || !event.surfaceId || !text) {
+    throw new Error("Conversation Event identity, Surface identity, and text are required");
+  }
+  return { ...event, text };
+}
+
 export function createArchiveSchema(database: DatabaseSync) {
   database.exec(`
     CREATE TABLE IF NOT EXISTS archive_events (
@@ -24,19 +32,16 @@ export function createArchiveSchema(database: DatabaseSync) {
 }
 
 export function archiveEvent(database: DatabaseSync, event: ConversationEvent) {
-  const text = event.text.trim();
-  if (!event.id || !event.surfaceId || !text) {
-    throw new Error("Conversation Event identity, Surface identity, and text are required");
-  }
+  const normalized = normalizeConversationEvent(event);
   const archived = database.prepare("SELECT surface_id, text FROM archive_events WHERE id = ?").get(
-    event.id,
+    normalized.id,
   ) as { surface_id: string; text: string } | undefined;
   if (archived) {
-    assert.equal(archived.surface_id, event.surfaceId);
-    assert.equal(archived.text, text);
+    assert.equal(archived.surface_id, normalized.surfaceId);
+    assert.equal(archived.text, normalized.text);
     return;
   }
   database
     .prepare("INSERT INTO archive_events (id, surface_id, text) VALUES (?, ?, ?)")
-    .run(event.id, event.surfaceId, text);
+    .run(normalized.id, normalized.surfaceId, normalized.text);
 }

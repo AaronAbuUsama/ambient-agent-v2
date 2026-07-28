@@ -97,7 +97,7 @@ for (const law of dependencyLaws) {
     );
   }
   const files = (await readdir(join(root, law.sourceRoot), { recursive: true })).filter((path) =>
-    /\.(?:mjs|ts)$/u.test(path),
+    /\.[cm]?[jt]sx?$/u.test(path),
   );
   for (const path of files) {
     const source = await readFile(join(root, law.sourceRoot, path), "utf8");

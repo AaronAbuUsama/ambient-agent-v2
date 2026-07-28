@@ -1,5 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 
+import { normalizeConversationEvent } from "./archive.js";
 import type { ConversationEvent } from "./archive.js";
 import { stableId } from "./ids.js";
 import type { AttestationId, BeliefId, ConversationEventId } from "./ids.js";
@@ -41,17 +42,14 @@ export function createKnowledgeSchema(database: DatabaseSync) {
 }
 
 export function extractAttestation(event: ConversationEvent): Attestation {
-  const text = event.text.trim();
-  if (!event.id || !event.surfaceId || !text) {
-    throw new Error("Conversation Event identity, Surface identity, and text are required");
-  }
+  const normalized = normalizeConversationEvent(event);
   return {
-    id: stableId<"AttestationId">("att", event.id, text),
+    id: stableId<"AttestationId">("att", normalized.id, normalized.text),
     author: "scribe:synthetic",
-    claim: `The participant requested: ${text}`,
+    claim: `The participant requested: ${normalized.text}`,
     confidence: 1,
-    evidenceEventId: event.id,
-    evidenceQuote: text,
+    evidenceEventId: normalized.id,
+    evidenceQuote: normalized.text,
   };
 }
 
