@@ -27,6 +27,7 @@ Last updated: 2026-07-28.
   from the explicit proof subpath.
 - All eight durable-boundary interruption runs converge to the same canonical database and
   one provider delivery with zero duplicate external effects.
+- The same Build 2 spine gate passes on merged commit `7b581ba`.
 
 ## Mechanically green
 
@@ -37,8 +38,8 @@ Last updated: 2026-07-28.
 - Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
   `0.6.0`; emitted runtime JavaScript remains the process artifact.
 - GitHub CI passes on Build 1 PR #2.
-- GitHub CI passed on ready Build 2 PR #3 head `761c9a9`; this is exact historical PR-head
-  evidence, not merged-commit proof.
+- GitHub CI passed on ready Build 2 PR #3 head `c2c76e5`; merged-commit runtime proof is
+  recorded separately above.
 
 ## Human-only validation
 
@@ -60,6 +61,5 @@ Last updated: 2026-07-28.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-The next stage boundary is final-head CI, merge, and a merged-commit Build 2 spine proof.
-Only then is Build 3 the legal implementation step defined in
-[`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
+Build 2's final-head CI, merge, and merged-commit runtime proof are complete. Build 3 is now
+the legal implementation step defined in [`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
