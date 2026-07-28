@@ -31,7 +31,7 @@ Last updated: 2026-07-28.
 
 ## Externally proven (local P4)
 
-- Clean implementation commit `77ee469` ran one synthetic Conversation Event through real
+- Merged commit `ab73b1b` ran one synthetic Conversation Event through real
   OpenCode Go `glm-5.1` inference for the global Scribe, one Brain, and one Speaker.
 - Each role produced schema-validated structured output and real provider response IDs with
   non-zero token usage. The observed Speaker output contained none of the persisted
@@ -40,8 +40,8 @@ Last updated: 2026-07-28.
 - Trusted Coworker code assigned the durable Attestation, Attention, Brain Batch, and Effect
   identities, then settled one synthetic Surface delivery with zero duplicates.
 - The ignored local receipt is
-  `receipts/build-3a/2026-07-28T11-38-52.039Z/receipt.json`; its finalized SQLite artifact
-  hashes to `87aec8feb9cdfad45541a26ab5e11311e0603cf99c31b4e860bd4dbc0620931c`.
+  `receipts/build-3a/2026-07-28T11-48-45.706Z/receipt.json`; its finalized SQLite artifact
+  hashes to `c80399d7d2a0e00e822b216e61e2af9afc4ebf5635eebcb2fce6dbeed568590f`.
 - This proves the real model boundary only. It does not prove WhatsApp or replay of an
   unrecorded model output after process interruption.
 
@@ -57,6 +57,8 @@ Last updated: 2026-07-28.
   separate from deterministic `pnpm check`.
 - GitHub CI passes on Build 1 PR #2.
 - GitHub CI passed on ready Build 2 PR #3 head `c2c76e5`; merged-commit runtime proof is
+  recorded separately above.
+- GitHub CI passed on ready Build 3A PR #5 head `c4c455d`; merged-commit external proof is
   recorded separately above.
 
 ## Human-only validation
@@ -79,6 +81,6 @@ Last updated: 2026-07-28.
 - No VPS deployment.
 - No multi-tenant isolation or production-runtime claim.
 
-Build 3A's implementation and local P4 proof are complete on the branch. Its final-head CI,
-PR merge, and merged-commit proof remain required before Build 3 becomes the legal
-implementation step defined in [`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
+Build 3A's final-head CI, PR merge, and merged-commit external proof are complete. Build 3 is
+now the legal implementation step defined in
+[`docs/BUILD-PLAN.md`](./docs/BUILD-PLAN.md).
