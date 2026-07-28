@@ -15,6 +15,7 @@ import {
   readCanonicalSpineState,
   readSpineOutcome,
   runCoworkerSpine,
+  syntheticReasoner,
 } from "@ambient-agent/coworker/proof";
 import type { BrainEffect, DurableBoundary } from "@ambient-agent/coworker/proof";
 import { runDeterministicEvals } from "../evals/src/runner.js";
@@ -114,6 +115,7 @@ export async function runSpineDemo() {
   const baselineCoworker = createCoworker({
     databasePath: baselineDatabase,
     surface: baselineSurface,
+    reasoner: syntheticReasoner,
   });
   baselineCoworker.admitConversationEvent(event);
   await baselineCoworker.runUntilIdle();

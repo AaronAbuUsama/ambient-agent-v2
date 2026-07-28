@@ -9,9 +9,11 @@
   },
   "dependencies": {
     "@ambient-agent/agents": "workspace:*",
+    "@ambient-agent/coworker": "workspace:^",
     "@earendil-works/pi-ai": "0.81.1",
     "@flue/runtime": "2.0.0-nightly.202607240825",
-    "hono": "4.12.32"
+    "hono": "4.12.32",
+    "valibot": "1.4.2"
   },
   "devDependencies": {
     "@flue/cli": "2.0.0-nightly.202607240825",

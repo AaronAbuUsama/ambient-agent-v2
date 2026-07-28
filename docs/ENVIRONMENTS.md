@@ -12,6 +12,7 @@ Production remains on the existing service until the final cutover.
 | Build 0 | required | required | absent | untouched |
 | Build 1 | primary | required | optional recovery confirmation | untouched |
 | Build 2 | primary | required | unnecessary | untouched |
+| Build 3A | required real-model P4 | mechanical only | unnecessary | untouched |
 | Build 3 | primary provider proof | mechanical only | required restart/soak | untouched |
 | Build 4 | fixture/tunnel proof | mechanical only | required webhook/soak | untouched |
 | Build 5 | contract development | mechanical only | required two-tenant proof | untouched |
@@ -65,7 +66,8 @@ application identities are the continuity boundary.
 |---|---|
 | Build 0 | GitHub repository authentication only |
 | Build 1 | development model provider |
-| Build 2 | development model provider; Braintrust optional for local traces |
+| Build 2 | none; deterministic local provider only |
+| Build 3A | OpenCode Go development credential; Braintrust remains optional and unproven |
 | Build 3 | dedicated development WhatsApp account |
 | Build 4 | dedicated development GitHub App and sandbox repository |
 | Build 5 | staging control-plane and per-tenant secrets |

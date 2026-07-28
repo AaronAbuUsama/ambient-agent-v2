@@ -9,13 +9,16 @@ repository is a source of validated lessons and narrow donor code, not a structu
 
 ## Current state
 
-**Build 2 implements the synthetic Coworker core spine.**
+**Build 3A adds the first real-model Coworker slice on top of the proven synthetic spine.**
 
 One synthetic Conversation Event now crosses the real application boundaries: immutable
 Archive, evidence-bearing Scribe Attestation, deterministic Graph projection, durable
 Attention, stable Brain Batch, typed Brain Effect, and an idempotent synthetic Surface. The
 interruption matrix proves convergence after every durable boundary. See [`STATUS.md`](./STATUS.md)
 for the exact built-versus-proven boundary.
+
+The opt-in Build 3A proof sends the same application flow through real Flue Scribe, Brain, and
+Speaker agents using OpenCode Go, while keeping WhatsApp out of the experiment.
 
 ## Canon
 
@@ -37,11 +40,13 @@ pnpm install
 pnpm check
 pnpm demo:recovery
 pnpm demo:spine
+OPENCODE_GO_API_KEY=<development-key> pnpm demo:real-model
 pnpm evals
 pnpm evals:benchmark
 ```
 
-The proofs and E0–E2 eval floor are deterministic and require no production credentials.
+The default checks and E0–E2 eval floor are deterministic and require no provider credential.
+`demo:real-model` is an explicit local P4 proof and is never part of credential-free CI.
 Generated SQLite databases, reports, and receipts live under the ignored `receipts/` directory.
 Repository scripts, tests, and eval runners are TypeScript executed by the pinned Nub
 development dependency; `pnpm` remains the package manager.

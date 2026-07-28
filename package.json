@@ -11,6 +11,7 @@
     "check": "nub scripts/check-foundation.ts && pnpm typecheck && pnpm test && pnpm evals",
     "demo:spine": "pnpm build && nub scripts/spine-demo.ts",
     "demo:recovery": "pnpm build && nub scripts/recovery-demo.ts",
+    "demo:real-model": "pnpm build && nub scripts/real-model-demo.ts",
     "evals": "pnpm build && pnpm --filter @ambient-agent/evals eval",
     "evals:benchmark": "pnpm build && nub evals/src/runner.ts benchmark application/deterministic",
     "test": "pnpm build && nub --test tests/*.test.ts",

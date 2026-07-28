@@ -27,8 +27,8 @@ Do not infer readiness from directory names, plans, passing CI, or the old repos
 
 - `packages/coworker` owns application truth and contains no Flue, WhatsApp, or GitHub SDK
   imports.
-- `packages/agents` contains Flue agent definitions and depends only on Flue plus
-  `packages/coworker`.
+- `packages/agents` contains Flue agent definitions and depends only on Flue, its schema
+  validation library, and `packages/coworker`.
 - `apps/runtime` is the composition root for one tenant. External SDKs terminate here.
 - `apps/control-plane` provisions runtimes over the network and never imports runtime
   internals.

@@ -45,12 +45,24 @@ export function claimBatch(database: DatabaseSync, attentionId: AttentionId) {
 }
 
 export function decideEffect(event: ConversationEvent, batchId: BrainBatchId): BrainEffect {
+  return createSayEffect(event, batchId, `Recorded: ${event.text.trim()}`);
+}
+
+export function createSayEffect(
+  event: ConversationEvent,
+  batchId: BrainBatchId,
+  text: string,
+): BrainEffect {
+  const body = text.trim();
+  if (!body) {
+    throw new Error("Speaker text is required");
+  }
   return {
     id: stableId<"EffectId">("effect", batchId, event.surfaceId, event.text) as EffectId,
     batchId,
     type: "say",
     surfaceId: event.surfaceId,
-    text: `Recorded: ${event.text.trim()}`,
+    text: body,
   };
 }
 

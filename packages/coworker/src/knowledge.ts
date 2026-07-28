@@ -8,10 +8,16 @@ import { immediateTransaction } from "./transaction.js";
 
 export interface Attestation {
   id: AttestationId;
-  author: "scribe:synthetic";
+  author: "scribe:synthetic" | "scribe:model";
   claim: string;
   confidence: number;
   evidenceEventId: ConversationEventId;
+  evidenceQuote: string;
+}
+
+export interface AttestationProposal {
+  claim: string;
+  confidence: number;
   evidenceQuote: string;
 }
 
@@ -43,13 +49,42 @@ export function createKnowledgeSchema(database: DatabaseSync) {
 
 export function extractAttestation(event: ConversationEvent): Attestation {
   const normalized = normalizeConversationEvent(event);
+  return createAttestation(
+    normalized,
+    {
+      claim: `The participant requested: ${normalized.text}`,
+      confidence: 1,
+      evidenceQuote: normalized.text,
+    },
+    "scribe:synthetic",
+  );
+}
+
+export function createAttestation(
+  event: ConversationEvent,
+  proposal: AttestationProposal,
+  author: Attestation["author"] = "scribe:model",
+): Attestation {
+  const normalized = normalizeConversationEvent(event);
+  const claim = proposal.claim.trim();
+  const evidenceQuote = proposal.evidenceQuote.trim();
+  if (!claim || !evidenceQuote || !normalized.text.includes(evidenceQuote)) {
+    throw new Error("Scribe claim and exact source evidence are required");
+  }
+  if (
+    !Number.isFinite(proposal.confidence) ||
+    proposal.confidence < 0 ||
+    proposal.confidence > 1
+  ) {
+    throw new Error("Scribe confidence must be between 0 and 1");
+  }
   return {
     id: stableId<"AttestationId">("att", normalized.id, normalized.text),
-    author: "scribe:synthetic",
-    claim: `The participant requested: ${normalized.text}`,
-    confidence: 1,
+    author,
+    claim,
+    confidence: proposal.confidence,
     evidenceEventId: normalized.id,
-    evidenceQuote: normalized.text,
+    evidenceQuote,
   };
 }
 
@@ -68,6 +103,13 @@ export function recordAttestation(database: DatabaseSync, attestation: Attestati
       attestation.evidenceEventId,
       attestation.evidenceQuote,
     );
+  return database
+    .prepare(
+      `SELECT id, author, claim, confidence,
+        evidence_event_id AS evidenceEventId, evidence_quote AS evidenceQuote
+       FROM knowledge_attestations WHERE id = ?`,
+    )
+    .get(attestation.id) as unknown as Attestation;
 }
 
 function insertBelief(

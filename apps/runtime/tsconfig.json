@@ -1,4 +1,10 @@
 {
   "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@ambient-agent/coworker": ["../../packages/coworker/src/index.ts"],
+      "@ambient-agent/coworker/proof": ["../../packages/coworker/src/proof.ts"]
+    }
+  },
   "include": ["src/**/*.ts"]
 }

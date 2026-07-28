@@ -29,6 +29,9 @@ importers:
       '@ambient-agent/agents':
         specifier: workspace:*
         version: link:../../packages/agents
+      '@ambient-agent/coworker':
+        specifier: workspace:^
+        version: link:../../packages/coworker
       '@earendil-works/pi-ai':
         specifier: 0.81.1
         version: 0.81.1(ws@8.21.1)(zod@4.4.3)
@@ -38,6 +41,9 @@ importers:
       hono:
         specifier: 4.12.32
         version: 4.12.32
+      valibot:
+        specifier: 1.4.2
+        version: 1.4.2(typescript@7.0.2)
     devDependencies:
       '@flue/cli':
         specifier: 2.0.0-nightly.202607240825
@@ -69,6 +75,9 @@ importers:
       '@flue/runtime':
         specifier: 2.0.0-nightly.202607240825
         version: 2.0.0-nightly.202607240825(typescript@7.0.2)(ws@8.21.1)(zod@4.4.3)
+      valibot:
+        specifier: 1.4.2
+        version: 1.4.2(typescript@7.0.2)
     devDependencies:
       '@types/node':
         specifier: 24.13.3

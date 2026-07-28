@@ -4,12 +4,14 @@ import { admitAttention } from "./attention.js";
 import { archiveEvent, normalizeConversationEvent } from "./archive.js";
 import type { ConversationEventInput } from "./archive.js";
 import type { SurfaceDeliveryPort } from "./effects.js";
+import type { CoworkerReasoner } from "./reasoning.js";
 import { createSchema, runCoworkerSpine } from "./spine.js";
 import { immediateTransaction } from "./transaction.js";
 
 export function createCoworker(options: {
   databasePath: string;
   surface: SurfaceDeliveryPort;
+  reasoner: CoworkerReasoner;
 }) {
   return {
     admitConversationEvent(event: ConversationEventInput) {

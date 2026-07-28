@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./coworker": "./src/coworker.ts",
     "./recovery": "./src/recovery.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@flue/runtime": "2.0.0-nightly.202607240825"
+    "@flue/runtime": "2.0.0-nightly.202607240825",
+    "valibot": "1.4.2"
   },
   "devDependencies": {
     "@types/node": "24.13.3",
