@@ -36,6 +36,13 @@ export function ensureSurface(database: DatabaseSync, surfaceId: SurfaceId) {
     .run(surfaceId);
 }
 
+export function migrateBuild2ArchiveSurfaces(database: DatabaseSync) {
+  database.exec(`
+    INSERT OR IGNORE INTO surfaces (id, status)
+      SELECT DISTINCT surface_id, 'active' FROM archive_events;
+  `);
+}
+
 export function bindSurface(database: DatabaseSync, input: SurfaceBindingInput): SurfaceBinding {
   const binding = normalizeProviderConversationIdentity(input);
   const existing = database
