@@ -1,0 +1,34 @@
+{
+  "dataset": "brain-curated",
+  "version": "1.0.0",
+  "tier": "E2",
+  "cases": [
+    {
+      "id": "acknowledge-explicit-memory-request",
+      "caseVersion": "1.0.0",
+      "provenance": "Build 2 authored product requirement",
+      "tags": ["brain", "surface:synthetic", "difficulty:floor"],
+      "startingState": {},
+      "decisionBoundary": "Brain Effect selection",
+      "allowedEffects": ["say"],
+      "grader": {
+        "implementation": "semantic rubric plus deterministic invariants",
+        "rubricVersion": "1.0.0"
+      },
+      "input": {
+        "id": "event_curated_1",
+        "surfaceId": "surface_curated",
+        "text": "Remember the deployment window"
+      },
+      "acceptable": {
+        "effectTypes": ["say"],
+        "targetSurfaceId": "surface_curated",
+        "requiredMeaning": ["recorded", "deployment window"]
+      },
+      "forbidden": {
+        "effectTypes": ["github", "schedule"],
+        "otherSurface": true
+      }
+    }
+  ]
+}

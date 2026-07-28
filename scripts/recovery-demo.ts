@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
+import type { Server } from "node:http";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,33 +16,27 @@ const instanceId = "build-1-proof";
 const inputMessage = "Prove durable recovery.";
 const expectedText = "RECOVERED_ONCE";
 
-function deferred() {
-  let resolvePromise;
-  let rejectPromise;
-  const promise = new Promise((resolve, reject) => {
-    resolvePromise = resolve;
-    rejectPromise = reject;
-  });
-  return { promise, resolve: resolvePromise, reject: rejectPromise };
-}
-
-async function listen(server) {
-  await new Promise((resolvePromise, rejectPromise) => {
+async function listen(server: Server) {
+  await new Promise<void>((resolvePromise, rejectPromise) => {
     server.once("error", rejectPromise);
     server.listen(0, "127.0.0.1", resolvePromise);
   });
-  return server.address().port;
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return address.port;
 }
 
 async function freePort() {
   const server = createServer();
   const port = await listen(server);
-  await new Promise((resolvePromise) => server.close(resolvePromise));
+  await new Promise<void>((resolvePromise, rejectPromise) => {
+    server.close((error) => (error ? rejectPromise(error) : resolvePromise()));
+  });
   return port;
 }
 
 function createDeterministicModel() {
-  const firstRequest = deferred();
+  const firstRequest = Promise.withResolvers<void>();
   let requests = 0;
 
   const server = createServer(async (request, response) => {
@@ -96,7 +92,15 @@ function createDeterministicModel() {
   };
 }
 
-function startRuntime({ databasePath, modelPort, port }) {
+function startRuntime({
+  databasePath,
+  modelPort,
+  port,
+}: {
+  databasePath: string;
+  modelPort: number;
+  port: number;
+}) {
   const child = spawn(process.execPath, ["apps/runtime/dist/server.mjs"], {
     cwd: repositoryRoot,
     env: {
@@ -108,7 +112,7 @@ function startRuntime({ databasePath, modelPort, port }) {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const output = [];
+  const output: string[] = [];
   for (const stream of [child.stdout, child.stderr]) {
     stream.setEncoding("utf8");
     stream.on("data", (chunk) => output.push(chunk));
@@ -116,7 +120,9 @@ function startRuntime({ databasePath, modelPort, port }) {
   return { child, output };
 }
 
-async function waitForHealth(url, runtime, timeoutMs = 15_000) {
+type RuntimeProcess = ReturnType<typeof startRuntime>;
+
+async function waitForHealth(url: string, runtime: RuntimeProcess, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (runtime.child.exitCode !== null) {
@@ -135,38 +141,40 @@ async function waitForHealth(url, runtime, timeoutMs = 15_000) {
   throw new Error(`Runtime did not become healthy:\n${runtime.output.join("")}`);
 }
 
-async function waitForExit(child) {
+async function waitForExit(child: ChildProcess) {
   if (child.exitCode !== null || child.signalCode !== null) {
     return;
   }
-  await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+  await new Promise<void>((resolvePromise) => child.once("exit", () => resolvePromise()));
 }
 
-async function withTimeout(promise, timeoutMs, message) {
-  let timeout;
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       promise,
-      new Promise((_, rejectPromise) => {
+      new Promise<never>((_, rejectPromise) => {
         timeout = setTimeout(() => rejectPromise(new Error(message)), timeoutMs);
       }),
     ]);
   } finally {
-    clearTimeout(timeout);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
   }
 }
 
-async function stop(child) {
+async function stop(child: ChildProcess) {
   if (child.exitCode === null && child.signalCode === null) {
     child.kill("SIGTERM");
     await waitForExit(child);
   }
 }
 
-function messageText(message) {
+function messageText(message: { parts: readonly { type: string; text?: string }[] }) {
   return message.parts
     .filter((part) => part.type === "text")
-    .map((part) => part.text)
+    .map((part) => part.text ?? "")
     .join("");
 }
 
@@ -204,8 +212,8 @@ export async function runRecoveryDemo() {
   const runtimePort = await freePort();
   const healthUrl = `http://127.0.0.1:${runtimePort}/health`;
   const conversationUrl = `http://127.0.0.1:${runtimePort}/agents/recovery/${instanceId}`;
-  let firstRuntime;
-  let secondRuntime;
+  let firstRuntime: RuntimeProcess | undefined;
+  let secondRuntime: RuntimeProcess | undefined;
 
   try {
     firstRuntime = startRuntime({ databasePath, modelPort, port: runtimePort });
@@ -363,7 +371,9 @@ export async function runRecoveryDemo() {
       firstRuntime ? stop(firstRuntime.child) : undefined,
       secondRuntime ? stop(secondRuntime.child) : undefined,
     ]);
-    await new Promise((resolvePromise) => model.server.close(resolvePromise));
+    await new Promise<void>((resolvePromise, rejectPromise) => {
+      model.server.close((error) => (error ? rejectPromise(error) : resolvePromise()));
+    });
   }
 }
 
