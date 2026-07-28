@@ -31,7 +31,7 @@ Last updated: 2026-07-28.
 
 ## Externally proven (local P4)
 
-- Clean implementation commit `08e74a4` ran one synthetic Conversation Event through real
+- Clean implementation commit `77ee469` ran one synthetic Conversation Event through real
   OpenCode Go `glm-5.1` inference for the global Scribe, one Brain, and one Speaker.
 - Each role produced schema-validated structured output and real provider response IDs with
   non-zero token usage. The observed Speaker output contained none of the persisted
@@ -40,8 +40,8 @@ Last updated: 2026-07-28.
 - Trusted Coworker code assigned the durable Attestation, Attention, Brain Batch, and Effect
   identities, then settled one synthetic Surface delivery with zero duplicates.
 - The ignored local receipt is
-  `receipts/build-3a/2026-07-28T11-25-03.800Z/receipt.json`; its finalized SQLite artifact
-  hashes to `2f8ad28bf3c98da2d801153fc2daa8dbb7b015b47f1cce2fc016ea4fff43f659`.
+  `receipts/build-3a/2026-07-28T11-38-52.039Z/receipt.json`; its finalized SQLite artifact
+  hashes to `87aec8feb9cdfad45541a26ab5e11311e0603cf99c31b4e860bd4dbc0620931c`.
 - This proves the real model boundary only. It does not prove WhatsApp or replay of an
   unrecorded model output after process interruption.
 
