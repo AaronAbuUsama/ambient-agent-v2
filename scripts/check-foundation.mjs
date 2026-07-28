@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { access, readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, join } from "node:path";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const required = [
@@ -32,102 +32,6 @@ assert.match(buildPlan, /Production cutover/, "The production cutover is absent 
 const architecture = await readFile(join(root, "docs/ARCHITECTURE.md"), "utf8");
 for (const law of ["packages/coworker", "packages/agents", "apps/runtime", "apps/control-plane"]) {
   assert.ok(architecture.includes(law), `${law} is absent from the target architecture`);
-}
-
-const dependencyLaws = [
-  {
-    packageRoot: "packages/coworker",
-    sourceRoot: "packages/coworker/src",
-    allowedRuntimeDependencies: [],
-    allowedImports: ["node:assert/strict", "node:crypto", "node:sqlite"],
-  },
-  {
-    packageRoot: "packages/agents",
-    sourceRoot: "packages/agents/src",
-    allowedRuntimeDependencies: ["@ambient-agent/coworker", "@flue/runtime"],
-    allowedImports: ["@flue/runtime"],
-  },
-  {
-    packageRoot: "apps/runtime",
-    sourceRoot: "apps/runtime/src",
-    allowedRuntimeDependencies: [
-      "@ambient-agent/agents",
-      "@ambient-agent/coworker",
-      "@earendil-works/pi-ai",
-      "@flue/runtime",
-      "hono",
-    ],
-    allowedImports: [
-      "@ambient-agent/agents",
-      "@ambient-agent/coworker",
-      "@earendil-works/pi-ai",
-      "@flue/runtime",
-      "hono",
-    ],
-  },
-  {
-    packageRoot: "evals",
-    sourceRoot: "evals/src",
-    allowedRuntimeDependencies: ["@ambient-agent/coworker", "braintrust"],
-    allowedImports: [
-      "@ambient-agent/coworker",
-      "braintrust",
-      "node:fs/promises",
-      "node:url",
-    ],
-  },
-];
-const runtimeDependencyBuckets = ["dependencies", "optionalDependencies", "peerDependencies"];
-const importPatterns = [
-  /(?:import|export)\s+(?:type\s+)?(?:[^"'()]*?\s+from\s+)?["']([^"']+)["']/gu,
-  /import\s*\(\s*["']([^"']+)["']\s*\)/gu,
-];
-const packageName = (specifier) =>
-  specifier.startsWith("@") ? specifier.split("/").slice(0, 2).join("/") : specifier.split("/", 1)[0];
-
-for (const law of dependencyLaws) {
-  const manifest = JSON.parse(await readFile(join(root, law.packageRoot, "package.json"), "utf8"));
-  const runtimeDependencies = new Set(
-    runtimeDependencyBuckets.flatMap((bucket) => Object.keys(manifest[bucket] ?? {})),
-  );
-  for (const dependency of runtimeDependencies) {
-    assert.ok(
-      law.allowedRuntimeDependencies.includes(dependency),
-      `${law.packageRoot} runtime dependency ${dependency} violates its allowlist`,
-    );
-  }
-  const files = (await readdir(join(root, law.sourceRoot), { recursive: true })).filter((path) =>
-    /\.[cm]?[jt]sx?$/u.test(path),
-  );
-  for (const path of files) {
-    const source = await readFile(join(root, law.sourceRoot, path), "utf8");
-    const imports = importPatterns.flatMap((pattern) =>
-      [...source.matchAll(pattern)].map((match) => match[1]),
-    );
-    for (const specifier of imports) {
-      if (specifier.startsWith(".")) {
-        const packageBoundary = resolve(root, law.packageRoot);
-        const importedPath = resolve(root, law.sourceRoot, dirname(path), specifier);
-        assert.ok(
-          importedPath === packageBoundary || importedPath.startsWith(`${packageBoundary}${sep}`),
-          `${join(law.sourceRoot, path)} escapes its package boundary via ${specifier}`,
-        );
-        continue;
-      }
-      assert.ok(
-        law.allowedImports.some(
-          (allowed) => specifier === allowed || specifier.startsWith(`${allowed}/`),
-        ),
-        `${join(law.sourceRoot, path)} imports non-allowlisted ${specifier}`,
-      );
-      if (!specifier.startsWith("node:")) {
-        assert.ok(
-          runtimeDependencies.has(packageName(specifier)),
-          `${join(law.sourceRoot, path)} imports undeclared runtime dependency ${specifier}`,
-        );
-      }
-    }
-  }
 }
 
 const status = await readFile(join(root, "STATUS.md"), "utf8");

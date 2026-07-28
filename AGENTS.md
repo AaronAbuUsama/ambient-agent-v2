@@ -36,6 +36,8 @@ Do not infer readiness from directory names, plans, passing CI, or the old repos
   not write each other's tables.
 - The Brain decides. Speakers converse. The Scribe proposes knowledge. External effects are
   executed by typed application ports.
+- Reviewers inspect every PR diff for these laws. They are architectural judgement, not a
+  custom source-scanning gate.
 
 ## Work flow
 

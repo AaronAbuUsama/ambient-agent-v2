@@ -27,7 +27,7 @@ Last updated: 2026-07-28.
 - `pnpm typecheck` passes for the runtime, agent, Coworker, and eval packages.
 - `pnpm test` builds the artifacts and passes the Flue recovery and synthetic-spine scenarios.
 - `pnpm evals` passes generated-invariant E0, recorded-fixture E1, and curated-rubric E2.
-- `pnpm check` enforces dependency laws and runs typecheck, build, both proofs, and evals.
+- `pnpm check` validates repository canon and runs typecheck, build, both proofs, and evals.
 - GitHub CI passes on Build 1 PR #2.
 - GitHub CI passed on ready Build 2 PR #3 at head `bb10de1`; this is PR-head mechanical
   evidence, not merged-commit proof.

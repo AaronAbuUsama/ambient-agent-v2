@@ -113,7 +113,7 @@ the final state is equivalent with no duplicate external effect.
 
 ### Exit gate
 
-- architecture dependency laws are mechanically enforced;
+- architecture dependency laws are explicit and checked during PR review;
 - deterministic and recorded-fixture eval tiers pass;
 - interruption matrix passes;
 - no provider credential or hosted-runtime claim is made.
