@@ -36,7 +36,7 @@ for (const law of ["packages/coworker", "packages/agents", "apps/runtime", "apps
 
 const status = await readFile(join(root, "STATUS.md"), "utf8");
 assert.match(status, /Designed, not built/, "STATUS.md must distinguish design from implementation");
-assert.match(status, /No Flue runtime/, "STATUS.md must deny a runtime claim during Build 0");
+assert.match(status, /Explicitly absent/, "STATUS.md must state its negative proof boundary");
 
 const docs = (await readdir(join(root, "docs"), { recursive: true }))
   .filter((path) => path.endsWith(".md"))
@@ -53,5 +53,5 @@ for (const path of markdown) {
 }
 
 console.log(
-  `Build 0 foundation is coherent: ${required.length} canonical artifacts and ${markdown.length} Markdown files checked.`,
+  `Repository canon is coherent: ${required.length} canonical artifacts and ${markdown.length} Markdown files checked.`,
 );

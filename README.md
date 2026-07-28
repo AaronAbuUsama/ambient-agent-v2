@@ -9,11 +9,12 @@ repository is a source of validated lessons and narrow donor code, not a structu
 
 ## Current state
 
-**Build 0 is the repository foundation. No application runtime exists yet.**
+**Build 1 implements the local durable Flue v2 Node recovery floor.**
 
-The durable plan, dependency laws, environment boundaries, evaluation methodology, proof
-contract, and production cutover are defined here before Build 1 introduces application
-code. See [`STATUS.md`](./STATUS.md) for the honest built-versus-planned boundary.
+One real Flue agent is mounted behind operator authentication, persists its conversation in a
+tenant SQLite database, and has an executable proof that kills the Node process during a model
+request, restarts it against the same database, and observes one terminal continuation for the
+same submission. See [`STATUS.md`](./STATUS.md) for the exact built-versus-proven boundary.
 
 ## Canon
 
@@ -27,12 +28,15 @@ Read these in order:
 6. [`docs/EVALS.md`](./docs/EVALS.md) — evaluation and model-benchmark methodology.
 7. [`docs/CUTOVER.md`](./docs/CUTOVER.md) — replacement and rollback procedure.
 
-## Build 0 check
+## Check and recovery proof
 
 ```bash
 corepack enable
 pnpm install
 pnpm check
+pnpm demo:recovery
 ```
 
-Build 0 deliberately has no application dependencies and requires no production credentials.
+The recovery proof uses a deterministic local model endpoint and requires no production
+credentials. It writes its SQLite database and JSON receipt under the ignored `receipts/`
+directory.
