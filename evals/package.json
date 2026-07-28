@@ -1,0 +1,14 @@
+{
+  "name": "@ambient-agent/evals",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "eval": "node src/runner.mjs deterministic",
+    "typecheck": "node --check src/runner.mjs"
+  },
+  "dependencies": {
+    "@ambient-agent/coworker": "workspace:*",
+    "braintrust": "0.0.169"
+  }
+}

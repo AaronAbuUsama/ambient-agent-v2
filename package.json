@@ -7,9 +7,11 @@
   "author": "Aaron AbuUsama",
   "type": "module",
   "scripts": {
-    "build": "pnpm --filter @ambient-agent/runtime build",
-    "check": "node scripts/check-foundation.mjs && pnpm typecheck && pnpm test",
+    "build": "pnpm --filter @ambient-agent/coworker build && pnpm --filter @ambient-agent/runtime build",
+    "check": "node scripts/check-foundation.mjs && pnpm typecheck && pnpm test && pnpm evals",
+    "demo:spine": "pnpm build && node scripts/spine-demo.mjs",
     "demo:recovery": "pnpm build && node scripts/recovery-demo.mjs",
+    "evals": "pnpm build && pnpm --filter @ambient-agent/evals eval",
     "test": "pnpm build && node --test tests/*.test.mjs",
     "typecheck": "pnpm --recursive typecheck"
   },

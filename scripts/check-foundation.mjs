@@ -34,6 +34,31 @@ for (const law of ["packages/coworker", "packages/agents", "apps/runtime", "apps
   assert.ok(architecture.includes(law), `${law} is absent from the target architecture`);
 }
 
+const dependencyLaws = [
+  {
+    sourceRoot: "packages/coworker/src",
+    forbidden: ["@flue/", "whatsappd", "@octokit/"],
+  },
+  {
+    sourceRoot: "packages/agents/src",
+    forbidden: ["node:sqlite", "@libsql/", "better-sqlite3", "@earendil-works/pi-ai"],
+  },
+];
+for (const law of dependencyLaws) {
+  const files = (await readdir(join(root, law.sourceRoot), { recursive: true })).filter((path) =>
+    path.endsWith(".ts"),
+  );
+  for (const path of files) {
+    const source = await readFile(join(root, law.sourceRoot, path), "utf8");
+    for (const forbidden of law.forbidden) {
+      assert.ok(
+        !source.includes(forbidden),
+        `${join(law.sourceRoot, path)} violates its dependency law with ${forbidden}`,
+      );
+    }
+  }
+}
+
 const status = await readFile(join(root, "STATUS.md"), "utf8");
 assert.match(status, /Designed, not built/, "STATUS.md must distinguish design from implementation");
 assert.match(status, /Not proven/, "STATUS.md must state its negative proof boundary");

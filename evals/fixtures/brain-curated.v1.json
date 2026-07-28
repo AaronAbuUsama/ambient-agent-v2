@@ -1,0 +1,25 @@
+{
+  "dataset": "brain-curated",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "acknowledge-explicit-memory-request",
+      "provenance": "Build 2 authored product requirement",
+      "tags": ["brain", "surface:synthetic", "difficulty:floor"],
+      "input": {
+        "id": "event_curated_1",
+        "surfaceId": "surface_curated",
+        "text": "Remember the deployment window"
+      },
+      "acceptable": {
+        "effectTypes": ["say"],
+        "targetSurfaceId": "surface_curated",
+        "requiredMeaning": ["recorded", "deployment window"]
+      },
+      "forbidden": {
+        "effectTypes": ["github", "schedule"],
+        "otherSurface": true
+      }
+    }
+  ]
+}

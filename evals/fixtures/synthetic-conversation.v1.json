@@ -1,0 +1,22 @@
+{
+  "dataset": "synthetic-conversation",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "record-investigation-request",
+      "provenance": "Sanitized from ambient-agent/tests/brain/intent-admission.test.ts at quarry commit 7e20e68",
+      "tags": ["brain", "scribe", "surface:synthetic", "risk:integrity"],
+      "input": {
+        "id": "event_build_2",
+        "surfaceId": "surface_build_2",
+        "text": "Please investigate this."
+      },
+      "expected": {
+        "claim": "The participant requested: Please investigate this.",
+        "evidenceQuote": "Please investigate this.",
+        "effectType": "say",
+        "effectText": "Recorded: Please investigate this."
+      }
+    }
+  ]
+}
