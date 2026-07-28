@@ -6,11 +6,12 @@ import {
   runBenchmark,
   runCase,
   runDeterministicEvals,
-} from "../evals/src/runner.mjs";
+} from "../evals/src/runner.js";
 
 test("every eval shape preserves common evidence for local and Braintrust reports", async () => {
   const E0 = await runCase("reject-empty-evidence");
   assert.equal(E0.passed, true);
+  assert.ok(E0.output && typeof E0.output === "object" && "outcome" in E0.output);
   assert.equal(E0.output.outcome, "reject-invalid-observation");
 
   const [singleRow] = normalizeBraintrustRows(E0);

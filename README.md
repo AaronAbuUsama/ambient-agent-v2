@@ -43,3 +43,5 @@ pnpm evals:benchmark
 
 The proofs and E0–E2 eval floor are deterministic and require no production credentials.
 Generated SQLite databases, reports, and receipts live under the ignored `receipts/` directory.
+Repository scripts, tests, and eval runners are TypeScript executed by the pinned Nub
+development dependency; `pnpm` remains the package manager.

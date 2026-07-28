@@ -1,6 +1,8 @@
-export type { ConversationEvent } from "./archive.js";
+export { normalizeConversationEvent } from "./archive.js";
+export type { ConversationEvent, ConversationEventInput } from "./archive.js";
 export type { BrainEffect } from "./brain.js";
 export { decideEffect } from "./brain.js";
+export { createCoworker } from "./coworker.js";
 export type { SurfaceDeliveryPort } from "./effects.js";
 export { createBrainBatchId } from "./ids.js";
 export type * from "./ids.js";

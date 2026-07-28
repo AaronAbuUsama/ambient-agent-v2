@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runRecoveryDemo } from "../scripts/recovery-demo.mjs";
+import { runRecoveryDemo } from "../scripts/recovery-demo.js";
 
 test("an admitted Flue agent prompt settles once after a forced Node restart", async () => {
   const receipt = await runRecoveryDemo();

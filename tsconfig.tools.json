@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "paths": {
+      "@ambient-agent/coworker": ["./packages/coworker/src/index.ts"]
+    }
+  },
+  "include": ["scripts/**/*.ts", "tests/**/*.ts"]
+}

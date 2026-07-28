@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runSpineDemo } from "../scripts/spine-demo.mjs";
+import { runSpineDemo } from "../scripts/spine-demo.js";
 
 test("the synthetic Coworker spine converges after every durable interruption", async () => {
   const receipt = await runSpineDemo();

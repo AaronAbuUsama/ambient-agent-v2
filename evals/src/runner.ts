@@ -6,6 +6,139 @@ import {
   decideEffect,
   extractAttestation,
 } from "@ambient-agent/coworker";
+import type { ConversationEvent } from "@ambient-agent/coworker";
+
+type EvalTier = "E0" | "E1" | "E2";
+
+interface EvalCaseBase {
+  id: string;
+  caseVersion: string;
+  provenance: string;
+  tags: string[];
+  startingState: Record<string, unknown>;
+  decisionBoundary: string;
+  allowedEffects: string[];
+  grader: {
+    implementation: string;
+    rubricVersion: string;
+  };
+  input: ConversationEvent;
+}
+
+interface GeneratedCase extends EvalCaseBase {
+  expected: {
+    acceptableOutcomes: string[];
+    forbiddenOutcomes: string[];
+    invariants: string[];
+    errorPattern: string;
+  };
+}
+
+interface RecordedCase extends EvalCaseBase {
+  expected: {
+    claim: string;
+    evidenceQuote: string;
+    effectType: string;
+    effectText: string;
+    invariants: string[];
+  };
+}
+
+interface CuratedCase extends EvalCaseBase {
+  acceptable: {
+    effectTypes: string[];
+    targetSurfaceId: string;
+    requiredMeaning: string[];
+  };
+  forbidden: {
+    effectTypes: string[];
+    otherSurface: boolean;
+  };
+}
+
+type EvalCase = GeneratedCase | RecordedCase | CuratedCase;
+
+type EvalDataset =
+  | { dataset: string; version: string; tier: "E0"; cases: GeneratedCase[] }
+  | { dataset: string; version: string; tier: "E1"; cases: RecordedCase[] }
+  | { dataset: string; version: string; tier: "E2"; cases: CuratedCase[] };
+
+interface CaseResult {
+  id: string;
+  caseVersion: string;
+  provenance: string;
+  tags: string[];
+  startingState: Record<string, unknown>;
+  decisionBoundary: string;
+  allowedEffects: string[];
+  grader: EvalCaseBase["grader"];
+  input: ConversationEvent;
+  expected: unknown;
+  durationMs: number;
+  tokens: null;
+  costUsd: null;
+  traceIds: string[];
+  passed: boolean;
+  assertions?: Record<string, boolean>;
+  rubric?: Record<string, boolean>;
+  output: unknown;
+}
+
+interface EvalSuite {
+  dataset: string;
+  version: string;
+  passed: boolean;
+  cases: number;
+  results: CaseResult[];
+}
+
+type EvalReport = Record<EvalTier, EvalSuite>;
+
+interface PairedResult extends CaseResult {
+  tier: EvalTier;
+  dataset: string;
+  datasetVersion: string;
+}
+
+interface BenchmarkCandidate {
+  candidateId: string;
+  repetitions: number;
+  durationMs: number;
+  deterministicPassRate: number;
+  pairedResults: PairedResult[];
+  tokens: null;
+  costUsd: null;
+  traceIds: string[];
+}
+
+interface BenchmarkReport {
+  datasetVersions: string[];
+  repetitions: number;
+  candidates: BenchmarkCandidate[];
+  modelInferenceProven: boolean;
+}
+
+interface SingleCaseReport extends CaseResult {
+  tier: EvalTier;
+  dataset: string;
+  version: string;
+}
+
+interface BraintrustContext {
+  candidateId?: string;
+  tier: EvalTier;
+  dataset: string;
+  datasetVersion: string;
+  candidateDurationMs?: number;
+}
+
+interface BraintrustRow {
+  id: string;
+  input: Record<string, unknown>;
+  output: unknown;
+  scores: Record<string, number>;
+  metadata: Record<string, unknown>;
+}
 
 const generatedPath = fileURLToPath(
   new URL("../fixtures/generated-invariants.v1.json", import.meta.url),
@@ -16,8 +149,10 @@ const fixturePath = fileURLToPath(
 const curatedPath = fileURLToPath(new URL("../fixtures/brain-curated.v1.json", import.meta.url));
 const datasetPaths = [generatedPath, fixturePath, curatedPath];
 
-async function loadDatasets() {
-  return Promise.all(datasetPaths.map((path) => readFile(path, "utf8").then(JSON.parse)));
+async function loadDatasets(): Promise<EvalDataset[]> {
+  return Promise.all(
+    datasetPaths.map(async (path) => JSON.parse(await readFile(path, "utf8")) as EvalDataset),
+  );
 }
 
 export async function listCases() {
@@ -34,7 +169,12 @@ export async function listCases() {
   );
 }
 
-function completeCase(testCase, startedAt, evaluation) {
+function completeCase(
+  testCase: EvalCase,
+  startedAt: number,
+  evaluation: Pick<CaseResult, "passed" | "output"> &
+    Partial<Pick<CaseResult, "assertions" | "rubric">>,
+): CaseResult {
   return {
     id: testCase.id,
     caseVersion: testCase.caseVersion,
@@ -46,8 +186,12 @@ function completeCase(testCase, startedAt, evaluation) {
     grader: testCase.grader,
     input: testCase.input,
     expected:
-      testCase.expected ??
-      { acceptableOutcomes: testCase.acceptable, forbiddenOutcomes: testCase.forbidden },
+      "expected" in testCase
+        ? testCase.expected
+        : {
+            acceptableOutcomes: testCase.acceptable,
+            forbiddenOutcomes: testCase.forbidden,
+          },
     durationMs: performance.now() - startedAt,
     tokens: null,
     costUsd: null,
@@ -56,7 +200,7 @@ function completeCase(testCase, startedAt, evaluation) {
   };
 }
 
-function evaluateGeneratedCase(testCase) {
+function evaluateGeneratedCase(testCase: GeneratedCase): CaseResult {
   const startedAt = performance.now();
   let errorMessage = "";
   try {
@@ -78,7 +222,7 @@ function evaluateGeneratedCase(testCase) {
   });
 }
 
-function evaluateRecordedCase(testCase) {
+function evaluateRecordedCase(testCase: RecordedCase): CaseResult {
   const startedAt = performance.now();
   const attestation = extractAttestation(testCase.input);
   const effect = decideEffect(testCase.input, createBrainBatchId("eval", testCase.id));
@@ -96,7 +240,7 @@ function evaluateRecordedCase(testCase) {
   });
 }
 
-function evaluateCuratedCase(testCase) {
+function evaluateCuratedCase(testCase: CuratedCase): CaseResult {
   const startedAt = performance.now();
   const effect = decideEffect(testCase.input, createBrainBatchId("curated", testCase.id));
   const normalizedText = effect.text.toLowerCase();
@@ -115,14 +259,13 @@ function evaluateCuratedCase(testCase) {
   });
 }
 
-function executeCase(dataset, testCase) {
-  if (dataset.tier === "E0") return evaluateGeneratedCase(testCase);
-  if (dataset.tier === "E1") return evaluateRecordedCase(testCase);
-  if (dataset.tier === "E2") return evaluateCuratedCase(testCase);
-  throw new Error(`Unknown eval tier: ${dataset.tier}`);
+function executeCase(dataset: EvalDataset, testCase: EvalCase): CaseResult {
+  if (dataset.tier === "E0") return evaluateGeneratedCase(testCase as GeneratedCase);
+  if (dataset.tier === "E1") return evaluateRecordedCase(testCase as RecordedCase);
+  return evaluateCuratedCase(testCase as CuratedCase);
 }
 
-export async function runCase(caseId) {
+export async function runCase(caseId: string): Promise<SingleCaseReport> {
   const datasets = await loadDatasets();
   for (const dataset of datasets) {
     const testCase = dataset.cases.find(({ id }) => id === caseId);
@@ -138,7 +281,7 @@ export async function runCase(caseId) {
   throw new Error(`Unknown eval case: ${caseId}`);
 }
 
-export async function runDeterministicEvals() {
+export async function runDeterministicEvals(): Promise<EvalReport> {
   const datasets = await loadDatasets();
   return Object.fromEntries(
     datasets.map((dataset) => {
@@ -154,15 +297,17 @@ export async function runDeterministicEvals() {
         },
       ];
     }),
-  );
+  ) as EvalReport;
 }
 
-const candidates = {
+const candidates: Record<string, () => Promise<EvalReport>> = {
   "application/deterministic": runDeterministicEvals,
 };
 
-export async function runBenchmark(candidateIds = ["application/deterministic"]) {
-  const candidateResults = [];
+export async function runBenchmark(
+  candidateIds = ["application/deterministic"],
+): Promise<BenchmarkReport> {
+  const candidateResults: BenchmarkCandidate[] = [];
   for (const candidateId of candidateIds) {
     const candidate = candidates[candidateId];
     if (!candidate) throw new Error(`Unknown executable benchmark candidate: ${candidateId}`);
@@ -173,13 +318,14 @@ export async function runBenchmark(candidateIds = ["application/deterministic"])
       repetitions: 1,
       durationMs: performance.now() - startedAt,
       deterministicPassRate: [evals.E0, evals.E1, evals.E2].every(({ passed }) => passed) ? 1 : 0,
-      pairedResults: Object.entries(evals).flatMap(([tier, suite]) =>
-        suite.results.map((result) => ({
-          tier,
-          dataset: suite.dataset,
-          datasetVersion: suite.version,
-          ...result,
-        })),
+      pairedResults: (Object.entries(evals) as Array<[EvalTier, EvalSuite]>).flatMap(
+        ([tier, suite]) =>
+          suite.results.map((result) => ({
+            tier,
+            dataset: suite.dataset,
+            datasetVersion: suite.version,
+            ...result,
+          })),
       ),
       tokens: null,
       costUsd: null,
@@ -194,7 +340,7 @@ export async function runBenchmark(candidateIds = ["application/deterministic"])
   };
 }
 
-function normalizeCase(result, context = {}) {
+function normalizeCase(result: CaseResult, context: BraintrustContext): BraintrustRow {
   const checks = result.assertions ?? result.rubric ?? {};
   return {
     id: `${context.candidateId ? `${context.candidateId}:` : ""}${context.dataset}:${result.id}`,
@@ -233,8 +379,10 @@ function normalizeCase(result, context = {}) {
   };
 }
 
-export function normalizeBraintrustRows(report) {
-  if (report.candidates) {
+export function normalizeBraintrustRows(
+  report: EvalReport | BenchmarkReport | SingleCaseReport,
+): BraintrustRow[] {
+  if ("candidates" in report) {
     return report.candidates.flatMap((candidate) =>
       candidate.pairedResults.map((result) =>
         normalizeCase(result, {
@@ -247,18 +395,19 @@ export function normalizeBraintrustRows(report) {
       ),
     );
   }
-  if (report.E0) {
-    return Object.entries(report).flatMap(([tier, suite]) =>
-      suite.results.map((result) =>
-        normalizeCase(result, {
-          tier,
-          dataset: suite.dataset,
-          datasetVersion: suite.version,
-        }),
-      ),
+  if ("E0" in report) {
+    return (Object.entries(report) as Array<[EvalTier, EvalSuite]>).flatMap(
+      ([tier, suite]) =>
+        suite.results.map((result) =>
+          normalizeCase(result, {
+            tier,
+            dataset: suite.dataset,
+            datasetVersion: suite.version,
+          }),
+        ),
     );
   }
-  if (report.id && report.dataset) {
+  if ("id" in report && "dataset" in report) {
     return [
       normalizeCase(report, {
         tier: report.tier,
@@ -270,7 +419,9 @@ export function normalizeBraintrustRows(report) {
   throw new Error("Unsupported Braintrust report shape");
 }
 
-export async function publishToBraintrust(report) {
+export async function publishToBraintrust(
+  report: EvalReport | BenchmarkReport | SingleCaseReport,
+) {
   if (!process.env.BRAINTRUST_API_KEY) {
     return { published: false, reason: "BRAINTRUST_API_KEY is not set" };
   }
@@ -280,7 +431,8 @@ export async function publishToBraintrust(report) {
     apiKey: process.env.BRAINTRUST_API_KEY,
     experiment: `build-2-${Date.now()}`,
     metadata: {
-      reportKind: report.candidates ? "benchmark" : report.E0 ? "E0/E1/E2" : "single-case",
+      reportKind:
+        "candidates" in report ? "benchmark" : "E0" in report ? "E0/E1/E2" : "single-case",
     },
   });
   for (const row of rows) {
@@ -297,23 +449,36 @@ export async function publishToBraintrust(report) {
 
 async function main() {
   const [command = "deterministic", argument] = process.argv.slice(2);
-  let report;
+  let report:
+    | Awaited<ReturnType<typeof listCases>>
+    | EvalReport
+    | BenchmarkReport
+    | SingleCaseReport;
   if (command === "list") report = await listCases();
-  else if (command === "run") report = await runCase(argument);
+  else if (command === "run") {
+    if (!argument) throw new Error("Eval case id is required");
+    report = await runCase(argument);
+  }
   else if (command === "benchmark") report = await runBenchmark(argument?.split(","));
   else if (command === "deterministic") report = await runDeterministicEvals();
   else throw new Error(`Unknown eval command: ${command}`);
 
-  if (report.E0 && ![report.E0, report.E1, report.E2].every(({ passed }) => passed)) {
+  if (
+    !Array.isArray(report) &&
+    "E0" in report &&
+    ![report.E0, report.E1, report.E2].every(({ passed }) => passed)
+  ) {
     throw new Error("Deterministic eval gate failed");
   }
   if (process.env.EVAL_REPORT_PATH) {
     await writeFile(process.env.EVAL_REPORT_PATH, `${JSON.stringify(report, null, 2)}\n`);
   }
+  let output: unknown = report;
   if (process.env.BRAINTRUST_PUBLISH === "1") {
-    report.braintrust = await publishToBraintrust(report);
+    if (Array.isArray(report)) throw new Error("Braintrust publication does not support case lists");
+    output = { ...report, braintrust: await publishToBraintrust(report) };
   }
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

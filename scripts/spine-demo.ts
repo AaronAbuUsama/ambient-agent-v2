@@ -7,26 +7,33 @@ import { spawnSync } from "node:child_process";
 import { DatabaseSync } from "node:sqlite";
 
 import {
+  createCoworker,
+  normalizeConversationEvent,
   durableBoundaries,
   rebuildGraph,
   readCanonicalSpineState,
   readSpineOutcome,
   runCoworkerSpine,
-} from "../packages/coworker/dist/index.js";
-import { runDeterministicEvals } from "../evals/src/runner.mjs";
+} from "@ambient-agent/coworker";
+import type {
+  BrainEffect,
+  DurableBoundary,
+  SurfaceDeliveryPort,
+} from "@ambient-agent/coworker";
+import { runDeterministicEvals } from "../evals/src/runner.js";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const event = {
+const event = normalizeConversationEvent({
   id: "event_build_2",
   surfaceId: "surface_build_2",
   text: "Remember the deployment window",
-};
+});
 
-class SyntheticSurface {
+class SyntheticSurface implements SurfaceDeliveryPort {
   attempts = 0;
-  deliveries = new Map();
+  deliveries = new Map<string, { text: string; providerEvidence: string }>();
 
-  async deliver(effect) {
+  async deliver(effect: BrainEffect) {
     this.attempts += 1;
     const existing = this.deliveries.get(effect.id);
     if (existing) {
@@ -46,7 +53,7 @@ class SyntheticSurface {
   }
 }
 
-function fingerprint(databasePath, surface) {
+function fingerprint(databasePath: string, surface: SyntheticSurface) {
   return createHash("sha256")
     .update(JSON.stringify({ database: readCanonicalSpineState(databasePath), surface: surface.snapshot() }))
     .digest("hex");
@@ -61,8 +68,8 @@ async function executedSourceFingerprint() {
     .sort();
   const paths = [
     ...builtPaths,
-    "scripts/spine-demo.mjs",
-    "evals/src/runner.mjs",
+    "scripts/spine-demo.ts",
+    "evals/src/runner.ts",
     "evals/fixtures/generated-invariants.v1.json",
     "evals/fixtures/synthetic-conversation.v1.json",
     "evals/fixtures/brain-curated.v1.json",
@@ -74,7 +81,7 @@ async function executedSourceFingerprint() {
   return digest.digest("hex");
 }
 
-async function runInterrupted(databasePath, boundary) {
+async function runInterrupted(databasePath: string, boundary: DurableBoundary) {
   const surface = new SyntheticSurface();
   let interrupted = false;
   await assert.rejects(
@@ -91,7 +98,7 @@ async function runInterrupted(databasePath, boundary) {
     }),
     new RegExp(boundary),
   );
-  await runCoworkerSpine({ databasePath, event, surface });
+  await createCoworker({ databasePath, surface }).admitConversationEvent(event);
   return { fingerprint: fingerprint(databasePath, surface), providerAttempts: surface.attempts };
 }
 
@@ -107,11 +114,10 @@ export async function runSpineDemo() {
 
   const baselineDatabase = resolve(artifactDirectory, "baseline.sqlite");
   const baselineSurface = new SyntheticSurface();
-  const baselineRun = await runCoworkerSpine({
+  const baselineRun = await createCoworker({
     databasePath: baselineDatabase,
-    event,
     surface: baselineSurface,
-  });
+  }).admitConversationEvent(event);
   const baselineFingerprint = fingerprint(baselineDatabase, baselineSurface);
   const projectionBeforeRebuild = readCanonicalSpineState(baselineDatabase).knowledge_beliefs;
   const projectionDatabase = new DatabaseSync(baselineDatabase);

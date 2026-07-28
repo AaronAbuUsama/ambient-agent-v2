@@ -8,20 +8,22 @@
   "type": "module",
   "scripts": {
     "build": "pnpm --filter @ambient-agent/coworker build && pnpm --filter @ambient-agent/runtime build",
-    "check": "node scripts/check-foundation.mjs && pnpm typecheck && pnpm test && pnpm evals",
-    "demo:spine": "pnpm build && node scripts/spine-demo.mjs",
-    "demo:recovery": "pnpm build && node scripts/recovery-demo.mjs",
+    "check": "nub scripts/check-foundation.ts && pnpm typecheck && pnpm test && pnpm evals",
+    "demo:spine": "pnpm build && nub scripts/spine-demo.ts",
+    "demo:recovery": "pnpm build && nub scripts/recovery-demo.ts",
     "evals": "pnpm build && pnpm --filter @ambient-agent/evals eval",
-    "evals:benchmark": "pnpm build && pnpm --filter @ambient-agent/evals exec node src/runner.mjs benchmark application/deterministic",
-    "test": "pnpm build && node --test tests/*.test.mjs",
-    "typecheck": "pnpm --recursive typecheck"
+    "evals:benchmark": "pnpm build && nub evals/src/runner.ts benchmark application/deterministic",
+    "test": "pnpm build && nub --test tests/*.test.ts",
+    "typecheck": "pnpm --recursive typecheck && tsc --noEmit -p tsconfig.tools.json"
   },
   "engines": {
     "node": ">=22.19.0"
   },
   "packageManager": "pnpm@9.15.9",
   "devDependencies": {
+    "@ambient-agent/coworker": "workspace:^",
     "@flue/sdk": "2.0.0-nightly.202607240825",
+    "@nubjs/nub": "0.6.0",
     "@types/node": "24.13.3",
     "typescript": "7.0.2"
   }

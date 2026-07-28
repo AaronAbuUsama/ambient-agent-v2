@@ -5,7 +5,8 @@ Last updated: 2026-07-28.
 ## Static foundation proven (P0)
 
 - The replacement GitHub repository exists independently from the old implementation.
-- Build 0 foundation validation runs with Node and no application dependencies.
+- Build 0 foundation validation runs as TypeScript through repository-pinned Nub with no
+  application dependencies.
 - The architecture, domain language, build order, proof contract, environment strategy,
   evaluation methodology, decisions, and cutover contract are versioned together.
 
@@ -19,6 +20,8 @@ Last updated: 2026-07-28.
 - The same recovery gate passes on merged Build 1 commit `a81e5ac`.
 - Build 2's synthetic Conversation Event crosses Archive, Scribe Attestation, Graph,
   Attention, one stable Brain Batch, one typed Brain Effect, and one synthetic Surface.
+- Runtime callers use one `createCoworker(...).admitConversationEvent(...)` application
+  boundary; the internal owner sequence is not exposed to adapters.
 - All eight durable-boundary interruption runs converge to the same canonical database and
   one provider delivery with zero duplicate external effects.
 
@@ -28,9 +31,11 @@ Last updated: 2026-07-28.
 - `pnpm test` builds the artifacts and passes the Flue recovery and synthetic-spine scenarios.
 - `pnpm evals` passes generated-invariant E0, recorded-fixture E1, and curated-rubric E2.
 - `pnpm check` validates repository canon and runs typecheck, build, both proofs, and evals.
+- Repository scripts, tests, and eval runners are TypeScript executed through pinned Nub
+  `0.6.0`; emitted runtime JavaScript remains the process artifact.
 - GitHub CI passes on Build 1 PR #2.
-- GitHub CI passed on ready Build 2 PR #3 at head `bb10de1`; this is PR-head mechanical
-  evidence, not merged-commit proof.
+- GitHub CI passed on an earlier ready Build 2 PR #3 head `bb10de1`; the current refactor head
+  requires a fresh CI run, and neither is merged-commit proof.
 
 ## Human-only validation
 

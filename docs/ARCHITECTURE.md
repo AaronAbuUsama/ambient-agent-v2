@@ -84,6 +84,20 @@ apps/control-plane -> provisioning contracts over the network
 - `apps/control-plane` must not import runtime internals or participate in a tenant's Brain.
 - Capabilities enter as cohesive domain modules, not generic command envelopes.
 
+## Coworker application boundary
+
+The tenant runtime constructs one Coworker and admits normalized source input through one
+application use case:
+
+```ts
+const coworker = createCoworker({ databasePath, surface });
+await coworker.admitConversationEvent({ id, surfaceId, text });
+```
+
+Archive, Scribe extraction, Graph projection, Attention, Brain batching, effect execution,
+transactions, and recovery stay behind that boundary. The lower-level spine entry point exists
+only for the synthetic interruption proof; runtime adapters must not coordinate those owners.
+
 ## Runtime topology
 
 One tenant runtime contains one Coworker:
@@ -116,7 +130,7 @@ Each tenant uses one physical SQL database. Logical ownership stays explicit:
 | WhatsApp adapter | provider authentication/session material |
 
 Sharing one database does not permit cross-module table writes. Cross-owner changes go through
-application use cases and transactions defined by the owning module.
+the Coworker application boundary and transactions defined by the owning modules.
 
 ## Brain, Scribe, and Speaker
 

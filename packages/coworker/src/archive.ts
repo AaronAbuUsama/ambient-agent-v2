@@ -3,18 +3,28 @@ import type { DatabaseSync } from "node:sqlite";
 
 import type { ConversationEventId, SurfaceId } from "./ids.js";
 
+export interface ConversationEventInput {
+  id: string;
+  surfaceId: string;
+  text: string;
+}
+
 export interface ConversationEvent {
   id: ConversationEventId;
   surfaceId: SurfaceId;
   text: string;
 }
 
-export function normalizeConversationEvent(event: ConversationEvent): ConversationEvent {
+export function normalizeConversationEvent(event: ConversationEventInput): ConversationEvent {
   const text = event.text.trim();
   if (!event.id || !event.surfaceId || !text) {
     throw new Error("Conversation Event identity, Surface identity, and text are required");
   }
-  return { ...event, text };
+  return {
+    id: event.id as ConversationEventId,
+    surfaceId: event.surfaceId as SurfaceId,
+    text,
+  };
 }
 
 export function createArchiveSchema(database: DatabaseSync) {
