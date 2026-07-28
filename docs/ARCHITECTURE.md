@@ -134,9 +134,9 @@ records `uncertain` without another send. `failed` and `uncertain` settle the or
 and create new delivery-sourced Attention; only `sent` carries provider evidence. Surfaces owns
 the delivery lifecycle and evidence, while Effects owns the semantic intent. Build 3.2 leaves
 delivery-sourced Attention pending for Brain judgment; it never translates that Attention into
-an automatic resend. One Coworker serializes its background drain, so two local triggers share
-the same active run instead of competing over a live provider attempt. Recovery of an already
-recorded delivery runs before any new model work.
+an automatic resend. One Coworker queues its background drains, so every local trigger receives
+a pass after the previous drain instead of competing over a live provider attempt or losing an
+admission wakeup. Recovery of an already recorded delivery runs before any new model work.
 
 ## Runtime topology
 

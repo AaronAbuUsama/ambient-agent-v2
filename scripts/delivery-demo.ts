@@ -64,7 +64,7 @@ async function runProviderOutcome(
     providerConversationId: `conversation_${providerOutcome instanceof Error ? "thrown" : providerOutcome.status}`,
   };
   coworker.bindSurface(source);
-  coworker.observeConversationEvent({
+  const observation = coworker.observeConversationEvent({
     ...source,
     providerMessageId: "message_delivery_demo",
     kind: "arrival",
@@ -74,7 +74,11 @@ async function runProviderOutcome(
   });
   await coworker.runUntilIdle();
   await coworker.runUntilIdle();
-  return { providerCalls, ...readOutcome(databasePath) };
+  return {
+    sourceEventId: observation.eventId,
+    providerCalls,
+    ...readOutcome(databasePath),
+  };
 }
 
 async function runInterruptedAttempt(databasePath: string) {
@@ -87,7 +91,10 @@ async function runInterruptedAttempt(databasePath: string) {
     },
   };
   const event = normalizeConversationEvent({
-    id: "event_delivery_demo_restart",
+    id: `event_${createHash("sha256")
+      .update("delivery-demo-restart")
+      .digest("hex")
+      .slice(0, 24)}`,
     surfaceId: "surface_delivery_demo_restart",
     text: "Do not retry this delivery blindly.",
   });
@@ -121,7 +128,13 @@ async function runInterruptedAttempt(databasePath: string) {
   };
   await runCoworkerSpine({ databasePath, event, surface, reasoner: unavailableReasoner });
   await runCoworkerSpine({ databasePath, event, surface, reasoner: unavailableReasoner });
-  return { providerCalls, modelCalls, ...readOutcome(databasePath) };
+  return {
+    sourceEventId: event.id,
+    interruptionPoint: "delivery-attempting" as const,
+    providerCalls,
+    modelCalls,
+    ...readOutcome(databasePath),
+  };
 }
 
 async function sourceFingerprint() {
@@ -206,6 +219,16 @@ export async function runDeliveryDemo() {
       .update(JSON.stringify({ database: "node:sqlite", provider: "synthetic" }))
       .digest("hex"),
     expected,
+    inputs: Object.fromEntries(
+      Object.entries(scenarios).map(([name, scenario]) => [
+        name,
+        { sourceEventId: scenario.sourceEventId },
+      ]),
+    ),
+    interruption: {
+      scenario: "interrupted",
+      point: scenarios.interrupted.interruptionPoint,
+    },
     scenarios,
     artifacts: {
       receipt: relative(repositoryRoot, receiptPath),
@@ -228,6 +251,11 @@ export async function runDeliveryDemo() {
       uncertainCreatesAttention: scenarios.uncertain.pendingDeliveryAttention === 1,
       interruptedAttemptNotRetried: scenarios.interrupted.providerCalls === 0,
       interruptedRecoveryDoesNotNeedModel: scenarios.interrupted.modelCalls === 0,
+      everyScenarioHasStableSourceIdentity: Object.values(scenarios).every(
+        ({ sourceEventId }) => /^event_[a-f0-9]{24}$/.test(sourceEventId),
+      ),
+      exactInterruptionPoint:
+        scenarios.interrupted.interruptionPoint === "delivery-attempting",
       everyDatabaseIntegrityCheckPassed: Object.values(scenarios).every(
         ({ integrity }) => integrity === "ok",
       ),

@@ -20,7 +20,7 @@ export function createCoworker(options: {
   surface: SurfaceDeliveryPort;
   reasoner: CoworkerReasoner;
 }) {
-  let activeRun: Promise<{ processed: number }> | undefined;
+  let drainTail: Promise<void> = Promise.resolve();
 
   async function drain() {
     let processed = 0;
@@ -109,12 +109,12 @@ export function createCoworker(options: {
       }
     },
     runUntilIdle() {
-      if (!activeRun) {
-        activeRun = drain().finally(() => {
-          activeRun = undefined;
-        });
-      }
-      return activeRun;
+      const run = drainTail.then(drain, drain);
+      drainTail = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
     },
   };
 }
