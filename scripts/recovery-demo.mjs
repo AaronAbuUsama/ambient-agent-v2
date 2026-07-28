@@ -156,9 +156,9 @@ async function withTimeout(promise, timeoutMs, message) {
   }
 }
 
-async function stop(child, signal = "SIGTERM") {
+async function stop(child) {
   if (child.exitCode === null && child.signalCode === null) {
-    child.kill(signal);
+    child.kill("SIGTERM");
     await waitForExit(child);
   }
 }
@@ -243,7 +243,7 @@ export async function runRecoveryDemo() {
     const history = await conversation.history({
       signal: AbortSignal.timeout(10_000),
     });
-    const settlement = history.settlements.filter(
+    const completedSettlements = history.settlements.filter(
       (candidate) =>
         candidate.submissionId === admission.submissionId && candidate.outcome === "completed",
     );
@@ -254,7 +254,7 @@ export async function runRecoveryDemo() {
 
     assert.equal(reply.submissionId, admission.submissionId);
     assert.equal(reply.text, expectedText);
-    assert.equal(settlement.length, 1);
+    assert.equal(completedSettlements.length, 1);
     assert.equal(assistantMessages.length, 1);
     assert.equal(messageText(assistantMessages[0]), expectedText);
     assert.equal(model.requestCount(), 2);
@@ -321,7 +321,7 @@ export async function runRecoveryDemo() {
         text: reply.text,
         terminalAssistantMessages: assistantMessages.length,
         duplicateTerminalMessages: Math.max(0, assistantMessages.length - 1),
-        completedSettlements: settlement.length,
+        completedSettlements: completedSettlements.length,
         modelRequests: model.requestCount(),
       },
       artifacts: {
@@ -330,7 +330,7 @@ export async function runRecoveryDemo() {
         receipt: receiptRelativePath,
       },
       assertions: {
-        completedSettlements: settlement.length === 1,
+        completedSettlements: completedSettlements.length === 1,
         databaseSurvivedRestart: true,
         duplicateTerminalMessages: assistantMessages.length - 1 === 0,
         modelRequests: model.requestCount() === 2,
@@ -345,6 +345,7 @@ export async function runRecoveryDemo() {
         unauthorizedInspectionRejected: unauthorized.status === 401,
       },
       notProven: [
+        "real external model/provider inference (deterministic local provider only)",
         "WhatsApp",
         "GitHub",
         "Brain",

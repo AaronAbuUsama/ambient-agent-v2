@@ -36,7 +36,7 @@ for (const law of ["packages/coworker", "packages/agents", "apps/runtime", "apps
 
 const status = await readFile(join(root, "STATUS.md"), "utf8");
 assert.match(status, /Designed, not built/, "STATUS.md must distinguish design from implementation");
-assert.match(status, /Explicitly absent/, "STATUS.md must state its negative proof boundary");
+assert.match(status, /Not proven/, "STATUS.md must state its negative proof boundary");
 
 const docs = (await readdir(join(root, "docs"), { recursive: true }))
   .filter((path) => path.endsWith(".md"))
